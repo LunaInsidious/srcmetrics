@@ -182,7 +182,7 @@ Number of linearly independent paths (McCabe).
 | Calculation | Function: 1 + decision nodes, excluding nested functions. Each `else if` / `elif`, each short-circuit operator (&&, \|\|, and, or), each ternary and each non-default case label is one decision. File: sum over its functions + decisions in top-level code. Project: sum over files. |
 | Unit | count |
 | Language Applicability | partially_language_dependent |
-| Limitations | Which constructs are decisions follows each language Mapping (e.g. Python comprehension `for`/`if` clauses count; Python `case _` counts as a case). |
+| Limitations | Which constructs are decisions follows each language Mapping (e.g. Python comprehension `for`/`if` clauses count; Python `case _:` and Rust `_ =>` count as cases). |
 | Reference | McCabe, T. J. (1976). A Complexity Measure. IEEE TSE SE-2(4). |
 
 ## `complexity.branch_count` — Branch Count

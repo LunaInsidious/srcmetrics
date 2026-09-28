@@ -41,7 +41,7 @@ static DEFINITIONS: &[MetricDefinition] = &[
         unit: "count",
         applicability: PartiallyLanguageDependent,
         limitations: "Which constructs are decisions follows each language Mapping (e.g. Python comprehension \
-                      `for`/`if` clauses count; Python `case _` counts as a case).",
+                      `for`/`if` clauses count; Python `case _:` and Rust `_ =>` count as cases).",
         reference: "McCabe, T. J. (1976). A Complexity Measure. IEEE TSE SE-2(4).",
     },
     count(
