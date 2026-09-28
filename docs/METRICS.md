@@ -605,3 +605,63 @@ Longest duplicated token run; 0 when there is none.
 | Limitations | Repetitive token sequences (e.g. long array literals) are reported as duplicates. |
 | Reference | - |
 
+## `dependency.fan_out` — Fan-out
+
+Number of distinct functions a function calls.
+
+| Item | Value |
+|---|---|
+| Definition | Distinct callee names of the call nodes in the function. |
+| Scope | function |
+| Input | Call nodes and their callee labels |
+| Calculation | Excludes calls made by nested functions. Includes callees defined outside the project. Calls without a callee name (e.g. `f()()`) are not counted. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Calls are resolved by callee name only (no types, scopes or imports). |
+| Reference | Henry, S. & Kafura, D. (1981). Software Structure Metrics Based on Information Flow. IEEE TSE SE-7(5). |
+
+## `dependency.fan_in` — Fan-in
+
+Number of distinct project functions that call a function.
+
+| Item | Value |
+|---|---|
+| Definition | Distinct functions in the project having a call whose callee name is this function's name. |
+| Scope | function |
+| Input | Call nodes and their callee labels, function names |
+| Calculation | Functions with the same name share the value. Anonymous functions have 0. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Name-based: same-named methods of different classes are not distinguished, which overestimates fan-in. |
+| Reference | Henry, S. & Kafura, D. (1981). Software Structure Metrics Based on Information Flow. IEEE TSE SE-7(5). |
+
+## `dependency.call_depth` — Call Depth
+
+Longest chain of calls through project functions.
+
+| Item | Value |
+|---|---|
+| Definition | Longest path, in edges, from the function in the project call graph with strongly connected components (recursion) collapsed. |
+| Scope | function |
+| Input | Call nodes and their callee labels, function names |
+| Calculation | Edges go from a function to every project function named like a callee. Edges inside a strongly connected component are not counted. 0 when the function calls no project function. |
+| Unit | calls |
+| Language Applicability | partially_language_dependent |
+| Limitations | Calls are resolved by callee name only (no types, scopes or imports). |
+| Reference | - |
+
+## `dependency.dependency_count` — Dependency Count
+
+Number of import / include declarations.
+
+| Item | Value |
+|---|---|
+| Definition | Nodes of kind import. |
+| Scope | file, project |
+| Input | Import nodes |
+| Calculation | Each imported item that the grammar represents as a separate declaration counts once (e.g. each Go import spec). Project: sum. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Import granularity differs between languages (Python `from a import b, c` is one import). |
+| Reference | - |
+
