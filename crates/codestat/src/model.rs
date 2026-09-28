@@ -54,7 +54,17 @@ pub fn read_labels(csv_text: &str) -> Result<Vec<Label>, ModelError> {
     reader
         .deserialize()
         .enumerate()
-        .map(|(i, r)| r.map_err(|e| ModelError(format!("labels CSV row {}: {e}", i + 2))))
+        .map(|(i, r)| {
+            let row = i + 2;
+            let label: Label = r.map_err(|e| ModelError(format!("labels CSV row {row}: {e}")))?;
+            if !label.score.is_finite() {
+                return Err(ModelError(format!(
+                    "labels CSV row {row}: score must be a finite number, got {}",
+                    label.score
+                )));
+            }
+            Ok(label)
+        })
         .collect()
 }
 
@@ -319,6 +329,28 @@ fn unusable(rows: &[Row], name: &str) -> Option<String> {
 }
 
 impl Model {
+    /// Loads a model written by `codestat model train`, checking that its vectors are consistent.
+    pub fn from_json(text: &str) -> Result<Model, ModelError> {
+        let model: Model = serde_json::from_str(text).map_err(|e| {
+            ModelError(format!(
+                "not a model ({e}); create one with `codestat model train`"
+            ))
+        })?;
+        let lengths = [
+            model.features.len(),
+            model.means.len(),
+            model.sds.len(),
+            model.coefficients.len(),
+        ];
+        if lengths.iter().any(|l| *l != lengths[0]) {
+            return Err(ModelError(format!(
+                "not a model: features, means, sds and coefficients lengths differ ({lengths:?}); \
+                 create one with `codestat model train`"
+            )));
+        }
+        Ok(model)
+    }
+
     /// Predicted score, or why it cannot be computed.
     pub fn predict(&self, metrics: &BTreeMap<String, Option<f64>>) -> Result<f64, String> {
         let x = self
@@ -598,5 +630,28 @@ mod tests {
         assert_eq!(labels[1].path, "src/b,c.py");
         assert!(read_labels("path,score\na,1\n").is_err());
         assert!(read_labels("path,function,score\na,,high\n").is_err());
+    }
+
+    #[test]
+    fn non_finite_label_scores_are_rejected() {
+        for bad in ["NaN", "inf", "1e400"] {
+            let err = read_labels(&format!("path,function,score\na.py,,{bad}\n")).unwrap_err();
+            assert!(
+                err.0.contains("row 2") && err.0.contains("finite"),
+                "{bad}: {}",
+                err.0
+            );
+        }
+    }
+
+    #[test]
+    fn models_with_inconsistent_vectors_are_rejected_when_loaded() {
+        let model = fit(&linear_rows(), UnitScope::File, &["a", "b"], None, 1.0).unwrap();
+        let mut value = serde_json::to_value(&model).unwrap();
+        assert_eq!(Model::from_json(&value.to_string()).unwrap(), model);
+        value["sds"] = serde_json::json!([1.0]);
+        let err = Model::from_json(&value.to_string()).unwrap_err();
+        assert!(err.0.contains("lengths"), "{}", err.0);
+        assert!(Model::from_json("{}").is_err());
     }
 }

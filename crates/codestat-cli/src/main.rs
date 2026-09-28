@@ -188,12 +188,8 @@ fn run(command: Command) -> Result<(), String> {
                     results,
                 },
         } => {
-            let trained: model::Model = serde_json::from_str(&read(&path)?).map_err(|e| {
-                format!(
-                    "{}: not a model ({e}); create one with `codestat model train`",
-                    path.display()
-                )
-            })?;
+            let trained = model::Model::from_json(&read(&path)?)
+                .map_err(|e| format!("{}: {e}", path.display()))?;
             write(
                 None,
                 &to_json(&model::predict_all(&trained, &load_results(&results)?))?,

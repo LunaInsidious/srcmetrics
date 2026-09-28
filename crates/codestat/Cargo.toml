@@ -15,7 +15,7 @@ tree-sitter-javascript = "0.25"
 tree-sitter-rust = "0.24"
 tree-sitter-cpp = "0.23"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["float_roundtrip"] }
 csv = "1"
 ignore = "0.4"
 time = { version = "0.3", features = ["formatting"] }
