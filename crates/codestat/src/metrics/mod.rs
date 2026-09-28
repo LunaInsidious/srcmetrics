@@ -3,6 +3,7 @@
 mod common;
 mod complexity;
 mod definition;
+mod duplication;
 mod function;
 mod halstead;
 mod nesting;
@@ -63,14 +64,25 @@ pub struct ProgramMetrics {
 }
 
 impl ProgramMetrics {
+    /// Adds `other`'s values. Both must describe the same program (same file and function counts).
     fn merge(&mut self, other: ProgramMetrics) {
         self.project.extend(other.project);
-        self.files
-            .resize_with(other.files.len(), FileMetrics::default);
+        if self.files.is_empty() {
+            self.files = other.files;
+            return;
+        }
+        assert_eq!(
+            self.files.len(),
+            other.files.len(),
+            "calculators must report every file"
+        );
         for (mine, theirs) in self.files.iter_mut().zip(other.files) {
+            assert_eq!(
+                mine.functions.len(),
+                theirs.functions.len(),
+                "calculators must report every function"
+            );
             mine.metrics.extend(theirs.metrics);
-            mine.functions
-                .resize_with(theirs.functions.len(), Metrics::default);
             for (f, g) in mine.functions.iter_mut().zip(theirs.functions) {
                 f.extend(g);
             }
@@ -115,6 +127,7 @@ pub fn calculators() -> Vec<Box<dyn Calculator>> {
         Box::new(nesting::NestingCalculator),
         Box::new(halstead::HalsteadCalculator),
         Box::new(function::FunctionCalculator),
+        Box::new(duplication::DuplicationCalculator),
     ]
 }
 
