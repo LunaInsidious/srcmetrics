@@ -5,5 +5,6 @@ pub mod error;
 pub mod ir;
 pub mod lang;
 pub mod metrics;
+pub mod model;
 pub mod result;
 pub mod stats;

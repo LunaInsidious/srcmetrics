@@ -2,9 +2,9 @@
 
 use clap::{Parser, Subcommand, ValueEnum};
 use codestat::analyze::analyze;
-use codestat::metrics;
 use codestat::result::{AnalysisResult, FileResult};
 use codestat::stats::{self, UnitScope};
+use codestat::{metrics, model};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -43,10 +43,44 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Unit::File)]
         scope: Unit,
     },
+    /// Experimental readability model fitted on your own labels (no built-in weights).
+    Model {
+        #[command(subcommand)]
+        command: ModelCommand,
+    },
     /// List the metric definitions.
     Metrics {
         #[arg(long, value_enum, default_value_t = DefinitionFormat::Json)]
         format: DefinitionFormat,
+    },
+}
+
+#[derive(Subcommand)]
+enum ModelCommand {
+    /// Fit a ridge regression on labelled files or functions and write the model (JSON).
+    Train {
+        /// Labels CSV with the header `path,function,score` (function empty for file labels).
+        #[arg(long)]
+        labels: PathBuf,
+        /// Comma-separated metric ids to use (default: every usable metric of the labels' scope).
+        #[arg(long, value_delimiter = ',')]
+        features: Option<Vec<String>>,
+        /// Ridge regularization strength (>= 0).
+        #[arg(long, default_value_t = 1.0)]
+        lambda: f64,
+        /// Write the model to this file instead of stdout.
+        #[arg(long, short)]
+        output: Option<PathBuf>,
+        /// Result files written by `codestat analyze` (JSON).
+        #[arg(required = true)]
+        results: Vec<PathBuf>,
+    },
+    /// Score every file or function of analysis results with a trained model (JSON).
+    Predict {
+        #[arg(long)]
+        model: PathBuf,
+        #[arg(required = true)]
+        results: Vec<PathBuf>,
     },
 }
 
@@ -110,6 +144,42 @@ fn run(command: Command) -> Result<(), String> {
                 stats::Report::of(&stats::units(&results, scope), &stats::metric_ids(scope));
             write(None, &to_json(&report)?)
         }
+        Command::Model {
+            command:
+                ModelCommand::Train {
+                    labels,
+                    features,
+                    lambda,
+                    output,
+                    results,
+                },
+        } => {
+            let results = load_results(&results)?;
+            let text = read(&labels)?;
+            let labels =
+                model::read_labels(&text).map_err(|e| format!("{}: {e}", labels.display()))?;
+            let trained = model::train(&results, &labels, features.as_deref(), lambda)
+                .map_err(|e| e.to_string())?;
+            write(output, &to_json(&trained)?)
+        }
+        Command::Model {
+            command:
+                ModelCommand::Predict {
+                    model: path,
+                    results,
+                },
+        } => {
+            let trained: model::Model = serde_json::from_str(&read(&path)?).map_err(|e| {
+                format!(
+                    "{}: not a model ({e}); create one with `codestat model train`",
+                    path.display()
+                )
+            })?;
+            write(
+                None,
+                &to_json(&model::predict_all(&trained, &load_results(&results)?))?,
+            )
+        }
         Command::Metrics { format } => {
             let definitions = metrics::definitions();
             let text = match format {
@@ -121,11 +191,16 @@ fn run(command: Command) -> Result<(), String> {
     }
 }
 
+fn read(path: &PathBuf) -> Result<String, String> {
+    std::fs::read_to_string(path)
+        .map_err(|e| format!("{}: {e}; check that the file exists", path.display()))
+}
+
 fn load_results(paths: &[PathBuf]) -> Result<Vec<AnalysisResult>, String> {
     paths
         .iter()
         .map(|p| {
-            let text = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+            let text = read(p)?;
             serde_json::from_str(&text).map_err(|e| {
                 format!("{}: not an analysis result ({e}); create one with `codestat analyze <PATH> -o result.json`", p.display())
             })

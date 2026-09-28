@@ -150,3 +150,53 @@ fn stats_rejects_a_file_that_is_not_a_result() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("codestat analyze"));
 }
+
+#[test]
+fn model_train_then_predict() {
+    let result = analyzed("equivalence");
+    let dir = format!("{}/../../target/cli-test", env!("CARGO_MANIFEST_DIR"));
+    let parsed = json(&codestat(&["stats", &result]));
+    assert!(parsed["units"].as_u64().unwrap() >= 5);
+    let files: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&result).unwrap()).unwrap();
+    let mut labels = String::from("path,function,score\n");
+    for (i, f) in files["files"].as_array().unwrap().iter().enumerate() {
+        labels += &format!("{},,{}\n", f["path"].as_str().unwrap(), i);
+    }
+    let labels_path = format!("{dir}/labels.csv");
+    std::fs::write(&labels_path, labels).unwrap();
+    let model_path = format!("{dir}/model.json");
+    let output = codestat(&[
+        "model",
+        "train",
+        "--labels",
+        &labels_path,
+        "-o",
+        &model_path,
+        &result,
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let model: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&model_path).unwrap()).unwrap();
+    assert!(
+        model["notice"]
+            .as_str()
+            .unwrap()
+            .starts_with("Experimental")
+    );
+    let predictions = json(&codestat(&[
+        "model",
+        "predict",
+        "--model",
+        &model_path,
+        &result,
+    ]));
+    assert_eq!(
+        predictions.as_array().unwrap().len(),
+        files["files"].as_array().unwrap().len()
+    );
+}
