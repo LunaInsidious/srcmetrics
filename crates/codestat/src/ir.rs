@@ -179,11 +179,15 @@ impl File {
         self.descendants_pruned(self.root, |n| n.kind == NodeKind::Function)
     }
 
-    /// Tokens whose range lies within `range`.
-    pub fn tokens_in(&self, range: SourceRange) -> impl Iterator<Item = &Token> {
-        self.tokens.iter().filter(move |t| {
-            t.range.start.offset >= range.start.offset && t.range.end.offset <= range.end.offset
-        })
+    /// Tokens whose range lies within `range`. Tokens are sorted by offset, so this is a slice.
+    pub fn tokens_in(&self, range: SourceRange) -> &[Token] {
+        let from = self
+            .tokens
+            .partition_point(|t| t.range.start.offset < range.start.offset);
+        let to = self
+            .tokens
+            .partition_point(|t| t.range.end.offset <= range.end.offset);
+        &self.tokens[from..to.max(from)]
     }
 }
 
@@ -192,22 +196,19 @@ pub mod builder {
     //! Hand-built IR for Metric Engine unit tests, independent of any parser (PLAN.md §13.4).
     use super::*;
 
-    pub fn pos(line: usize) -> Position {
+    /// Synthetic offsets: `line * 1000 + column`, so offset order matches line order.
+    fn at(line: usize, column: usize) -> Position {
         Position {
             line,
-            column: 0,
-            offset: 0,
+            column,
+            offset: line * 1000 + column,
         }
     }
 
     pub fn lines(first: usize, last: usize) -> SourceRange {
         SourceRange {
-            start: pos(first),
-            end: Position {
-                line: last,
-                column: 1,
-                offset: 0,
-            },
+            start: at(first, 0),
+            end: at(last, 999),
         }
     }
 
@@ -283,22 +284,33 @@ pub mod builder {
             body
         }
 
+        /// Adds a token on `line`, after the tokens already on that line.
         pub fn token(&mut self, kind: TokenKind, text: &str, line: usize) -> &mut Self {
-            let offset = self.file.tokens.len();
-            let start = Position {
-                line,
-                column: 0,
-                offset,
-            };
-            let end = Position {
-                line,
-                column: text.len(),
-                offset: offset + 1,
+            self.token_span(kind, text, line, line)
+        }
+
+        pub fn token_span(
+            &mut self,
+            kind: TokenKind,
+            text: &str,
+            first: usize,
+            last: usize,
+        ) -> &mut Self {
+            let column = self
+                .file
+                .tokens
+                .iter()
+                .filter(|t| t.range.end.line == first)
+                .count()
+                * 2;
+            let range = SourceRange {
+                start: at(first, column),
+                end: at(last, column + 1),
             };
             self.file.tokens.push(Token {
                 kind,
                 text: text.into(),
-                range: SourceRange { start, end },
+                range,
             });
             self
         }
