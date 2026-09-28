@@ -1,4 +1,4 @@
-//! Complexity Metrics (PLAN.md §8.2, ADR-0007, ADR-0011).
+//! Complexity Metrics (ADR-0007, ADR-0011).
 
 use super::common::{is_continuation, is_decision};
 use super::{

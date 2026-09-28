@@ -14,7 +14,7 @@ pub struct Mapping {
     pub language: &'static str,
     pub extensions: &'static [&'static str],
     pub grammar: fn() -> tree_sitter::Language,
-    /// Grammar crate name and version, reported as the parser version (PLAN.md §17).
+    /// Grammar crate name and version, reported as the parser version (design principle P10).
     /// Checked against Cargo.lock by tests.
     pub grammar_crate: (&'static str, &'static str),
     /// tree-sitter node type -> IR node kind. Unlisted named nodes become `Other`.

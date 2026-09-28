@@ -1,4 +1,4 @@
-//! Metric definitions (PLAN.md §9).
+//! Metric definitions (design principle P6).
 
 use serde::Serialize;
 
@@ -10,7 +10,7 @@ pub enum Scope {
     Project,
 }
 
-/// PLAN.md §6.1.
+/// How far a metric's definition depends on the language (design principle P6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Applicability {
@@ -37,7 +37,7 @@ pub struct MetricDefinition {
     pub reference: &'static str,
 }
 
-/// Version of the metric definitions (PLAN.md §17). Bump when any definition or calculation changes.
+/// Version of the metric definitions (design principle P10). Bump when any definition or calculation changes.
 pub const DEFINITION_VERSION: &str = "0.1.0";
 
 impl Scope {
@@ -58,42 +58,4 @@ impl Applicability {
             Applicability::LanguageSpecific => "language_specific",
         }
     }
-}
-
-/// Renders the metric definition document (docs/METRICS.md).
-pub fn to_markdown(definitions: &[&MetricDefinition]) -> String {
-    let mut out = format!(
-        "# メトリクス定義書\n\n\
-         このファイルは `crates/srcmetrics/src/metrics` の定義から生成される。直接編集しないこと。\n\
-         再生成: `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`\n\n\
-         Metric Definition Version: `{DEFINITION_VERSION}`\n\n"
-    );
-    for d in definitions {
-        let scopes: Vec<_> = d.scopes.iter().map(Scope::as_str).collect();
-        // Table cells: escape pipes, show "-" for empty values.
-        let cell = |s: &str| {
-            if s.is_empty() {
-                "-".to_string()
-            } else {
-                s.replace('|', "\\|")
-            }
-        };
-        out += &format!(
-            "## `{}` — {}\n\n{}\n\n| Item | Value |\n|---|---|\n\
-             | Definition | {} |\n| Scope | {} |\n| Input | {} |\n| Calculation | {} |\n| Unit | {} |\n\
-             | Language Applicability | {} |\n| Limitations | {} |\n| Reference | {} |\n\n",
-            d.id,
-            d.name,
-            d.description,
-            cell(d.definition),
-            cell(&scopes.join(", ")),
-            cell(d.input),
-            cell(d.calculation),
-            cell(d.unit),
-            d.applicability.as_str(),
-            cell(d.limitations),
-            cell(d.reference),
-        );
-    }
-    out
 }

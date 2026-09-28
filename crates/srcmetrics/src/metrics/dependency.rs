@@ -1,4 +1,4 @@
-//! Dependency Metrics (PLAN.md §8.6, ADR-0012).
+//! Dependency Metrics (ADR-0012).
 
 use super::{
     Applicability::*, Calculator, FileMetrics, MetricDefinition, Metrics, ProgramMetrics, Scope::*,

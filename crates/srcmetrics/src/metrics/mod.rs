@@ -1,4 +1,4 @@
-//! Metric Engine (PLAN.md §5.4, §8). Calculators read only the Common IR.
+//! Metric Engine. Calculators read only the Common IR (design principles P2, P4).
 
 mod cognitive;
 mod common;
@@ -10,13 +10,15 @@ mod documentation;
 mod duplication;
 mod function;
 mod halstead;
+mod markdown;
 mod nesting;
 mod size;
 
 use crate::ir::{File, Function, Program};
 use std::collections::BTreeMap;
 
-pub use definition::{Applicability, DEFINITION_VERSION, MetricDefinition, Scope, to_markdown};
+pub use definition::{Applicability, DEFINITION_VERSION, MetricDefinition, Scope};
+pub use markdown::{reference_pages, to_markdown};
 
 /// A metric value, or the reason it has none (ADR-0005). Never conflates "0" with "not computed".
 #[derive(Debug, Clone, PartialEq)]
@@ -65,7 +67,7 @@ impl From<f64> for MetricValue {
     }
 }
 
-/// Metric id -> value. Ordered for reproducible output (PLAN.md §13.1).
+/// Metric id -> value. Ordered for reproducible output (design principle P10).
 pub type Metrics = BTreeMap<&'static str, MetricValue>;
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -109,7 +111,7 @@ impl ProgramMetrics {
     }
 }
 
-/// An independent metric calculator (PLAN.md §12.2).
+/// An independent metric calculator (design principle P4).
 pub trait Calculator {
     fn definitions(&self) -> &'static [MetricDefinition];
     fn compute(&self, program: &Program) -> ProgramMetrics;

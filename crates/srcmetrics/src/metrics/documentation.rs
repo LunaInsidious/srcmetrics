@@ -1,4 +1,4 @@
-//! Documentation Metrics (PLAN.md §8.7, ADR-0013).
+//! Documentation Metrics (ADR-0013).
 //!
 //! Comment LOC and Comment Ratio are provided by the Size calculator (`size.comment_loc`,
 //! `size.comment_ratio`).

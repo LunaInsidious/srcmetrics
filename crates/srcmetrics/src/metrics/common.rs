@@ -47,7 +47,7 @@ pub(crate) fn line_classes(file: &File) -> Result<Vec<LineClass>, String> {
         .collect()
 }
 
-/// Statement-like node kinds (PLAN.md §8.1 Statement Count).
+/// Statement-like node kinds (size.statement_count).
 pub(crate) fn is_statement(kind: NodeKind) -> bool {
     use NodeKind::*;
     matches!(

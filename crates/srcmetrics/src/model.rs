@@ -1,5 +1,5 @@
 //! Experimental readability model: ridge regression fitted on user-provided labels (ADR-0019).
-//! There are no built-in weights: a model exists only when trained on labels (PLAN.md §10).
+//! There are no built-in weights: a model exists only when trained on labels (design principle P5).
 
 use crate::result::{AnalysisResult, FileResult};
 use crate::stats::{UnitScope, metric_ids};
@@ -69,7 +69,7 @@ pub fn read_labels(csv_text: &str) -> Result<Vec<Label>, ModelError> {
 }
 
 pub const EXPERIMENTAL_NOTICE: &str = "Experimental: fitted only on the labels provided by the user. \
-                                       srcmetrics has no built-in readability weights (PLAN.md §10).";
+                                       srcmetrics has no built-in readability weights.";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Model {

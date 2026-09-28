@@ -1,4 +1,4 @@
-//! Derived metrics (PLAN.md §16, ADR-0015): computed from standard metric values only.
+//! Derived metrics (ADR-0015, design principle P8): computed from standard metric values only.
 
 use super::{Applicability::*, MetricDefinition, MetricValue, Metrics, Scope};
 
@@ -28,7 +28,7 @@ const fn ratio(
             calculation: "not_applicable when the denominator is 0 or an input is unavailable.",
             unit: "ratio",
             applicability: PartiallyLanguageDependent,
-            limitations: "A normalization: its choice of denominator affects comparisons (PLAN.md §16).",
+            limitations: "A normalization: its choice of denominator affects comparisons.",
             reference: "",
         },
         compute,

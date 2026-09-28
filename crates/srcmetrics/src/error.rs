@@ -1,4 +1,4 @@
-//! Analysis errors (PLAN.md §14, ADR-0005).
+//! Analysis errors (ADR-0005, design principle P7).
 
 use std::fmt;
 

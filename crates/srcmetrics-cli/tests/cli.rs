@@ -97,14 +97,13 @@ fn metrics_lists_definitions_as_json() {
 }
 
 #[test]
-fn metrics_markdown_matches_the_definition_document() {
+fn metrics_markdown_renders_every_definition() {
     let output = srcmetrics(&["metrics", "--format", "markdown"]);
-    let doc = std::fs::read_to_string(format!(
-        "{}/../../docs/METRICS.md",
-        env!("CARGO_MANIFEST_DIR")
-    ))
-    .unwrap();
-    assert_eq!(String::from_utf8(output.stdout).unwrap(), doc);
+    let definitions = srcmetrics::metrics::definitions();
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        srcmetrics::metrics::to_markdown(&definitions)
+    );
 }
 
 #[test]

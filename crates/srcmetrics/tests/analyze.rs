@@ -1,4 +1,4 @@
-//! End-to-end analysis: directory -> result with run metadata (PLAN.md §11, §17, ADR-0010).
+//! End-to-end analysis: directory -> result with run metadata (ADR-0010, design principle P10).
 
 use srcmetrics::analyze::analyze;
 use srcmetrics::error::AnalysisError;

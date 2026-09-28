@@ -1,4 +1,4 @@
-//! Common Intermediate Representation (PLAN.md §7, ADR-0003).
+//! Common Intermediate Representation (ADR-0003).
 //!
 //! The IR is the only input of the Metric Engine. It carries no language-specific
 //! information other than the language id string.
@@ -198,7 +198,7 @@ impl File {
 
 #[cfg(test)]
 pub mod builder {
-    //! Hand-built IR for Metric Engine unit tests, independent of any parser (PLAN.md §13.4).
+    //! Hand-built IR for Metric Engine unit tests, independent of any parser.
     use super::*;
 
     /// Synthetic offsets: `line * 1000 + column`, so offset order matches line order.

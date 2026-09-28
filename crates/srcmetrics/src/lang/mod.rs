@@ -1,4 +1,4 @@
-//! Language Adapters: source code -> Common IR (PLAN.md §5.2, ADR-0004).
+//! Language Adapters: source code -> Common IR (ADR-0004).
 //!
 //! All language-specific knowledge lives in the `Mapping` tables of the
 //! per-language modules. The Metric Engine never imports this module.
@@ -22,7 +22,7 @@ pub trait LanguageAdapter: Sync {
     /// Language id written to the IR and to results (e.g. "c", "python").
     fn language(&self) -> &'static str;
     fn extensions(&self) -> &'static [&'static str];
-    /// Parser name and version, recorded with results for reproducibility (PLAN.md §17).
+    /// Parser name and version, recorded with results for reproducibility (design principle P10).
     fn parser_version(&self) -> String;
     fn to_ir(&self, path: &str, source: &str) -> Result<File, AnalysisError>;
 }

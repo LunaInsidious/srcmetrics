@@ -1,4 +1,4 @@
-//! Halstead Metrics (PLAN.md §8.3, ADR-0008).
+//! Halstead Metrics (ADR-0008).
 
 use super::{
     Applicability::*, Calculator, MetricDefinition, MetricValue, Metrics, ProgramMetrics, Scope::*,

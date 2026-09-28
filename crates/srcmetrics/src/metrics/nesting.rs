@@ -1,4 +1,4 @@
-//! Nesting Metrics (PLAN.md §8.2 Maximum / Average Nesting Depth).
+//! Nesting Metrics: maximum and average nesting depth.
 
 use super::common::{is_continuation, is_nesting, is_statement, nesting_levels};
 use super::{

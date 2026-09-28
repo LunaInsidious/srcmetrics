@@ -1,4 +1,4 @@
-//! Function Metrics (PLAN.md §8.4).
+//! Function Metrics.
 //!
 //! Function Length, Statement Count, Complexity, Maximum Nesting Depth and Return Count are
 //! provided at function scope by the Size, Complexity and Nesting calculators.

@@ -1,4 +1,4 @@
-//! Analysis result: the serialized output format (PLAN.md §11, §17, ADR-0010).
+//! Analysis result: the serialized output format (ADR-0010, design principle P10).
 
 use crate::metrics::{MetricValue, Metrics};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ pub struct AnalysisResult {
     pub files: Vec<FileResult>,
 }
 
-/// Identifies what was analyzed and with which versions (PLAN.md §17).
+/// Identifies what was analyzed and with which versions (design principle P10).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RunInfo {
     pub project: String,

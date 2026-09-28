@@ -1,29 +1,57 @@
-# srcmetrics 技術仕様書
+# srcmetrics 技術仕様書（開発者向け）
 
-要求仕様は [PLAN.md](../PLAN.md)、設計判断の根拠は [ADR.md](ADR.md)、各メトリクスの定義は [METRICS.md](METRICS.md)（コードから生成）を参照。
-本書は「現在の実装が何をどう行うか」を記述する。
+本書は srcmetrics の目的・設計原則と、現在の実装の内部構成を記述する。
+利用方法（CLI、出力形式、ライブラリ API、HTTP API）は利用者向けドキュメント（`docs/`、GitHub Pages）を、
+各メトリクスの定義は `docs/metrics/`（コードから生成）を、設計判断の根拠は [ADR](adr/README.md) を参照。
 
-## 1. 構成
+## 0. 目的とスコープ
+
+複数のプログラミング言語で書かれたソースコードから、可読性・理解容易性・保守性に関わる定量的なメトリクスを収集する。
+単一の「可読性スコア」を出すことは目的としない。各メトリクスを独立した特徴量として提供し、統計分析・相関分析・可読性モデルの構築に使えるようにする。
+
+対象外（将来の拡張候補を含む）：特定言語固有の型システムの複雑さ、フレームワーク依存性、コーディング規約違反、セキュリティ脆弱性やバグの検出、実行時性能、人間による主観的評価そのもの。
+
+## 1. 設計原則
+
+変更・追加はこれらの原則に従う。原則に反する変更が必要なら、先に ADR で原則を改める。コード中の「design principle Pn」はこの番号を指す。
+
+| # | 原則 |
+|---|---|
+| P1 | 言語固有の処理は Language Adapter（言語別 Mapping）に閉じ込める。Metric Engine は特定言語の構文・ノード名・機能を参照しない |
+| P2 | Metric Engine は Common IR だけを参照する |
+| P3 | IR は完全な AST の共通化を目指さず、メトリクスの計算に必要な最小限の情報だけを持つ |
+| P4 | メトリクスは独立した Calculator として実装し、Calculator 同士は互いの結果に依存しない（派生メトリクスは標準メトリクスの値から別段階で計算する：ADR-0015） |
+| P5 | 可読性を単一の数値に集約しない。重みを事前に決めたスコアを標準機能にしない（実験的モデルは利用者のラベルから学習する場合だけ：ADR-0019） |
+| P6 | 各メトリクスの定義・計算方法・単位・言語依存性（language_independent / partially_language_dependent / language_specific）・制約を明示する |
+| P7 | 計算不能と値 0 を区別する。計算できない値は null とし理由を併記する。解析エラーは種類を区別し、黙って部分的な結果を出さない |
+| P8 | 生のメトリクスを保持する。正規化値などの派生メトリクスは標準メトリクスと区別する（`derived.` 接頭辞） |
+| P9 | 言語の追加で Metric Engine を変更しない |
+| P10 | 同一の入力・パーサ版・メトリクス定義版に対して同一の結果を返す。結果には project, repository, commit, パーサ版, 定義版, 時刻を記録する |
+| P11 | 解析とメトリクス計算は外部ネットワークに接続せずに行う |
+
+## 2. 構成
 
 ```text
 crates/srcmetrics/          コアライブラリ（同期・ネットワーク非依存）
-  src/ir.rs               Common IR
-  src/error.rs            解析エラー
-  src/lang/               Language Adapter（tree-sitter 汎用変換器 + 言語別 Mapping）
-  src/metrics/            Metric Engine（Calculator 群、定義レジストリ）
-  src/analyze.rs          解析パイプライン（パス走査 → IR → メトリクス → 結果）
-  src/result.rs           解析結果の型（JSON 形式）
-  src/csv.rs              CSV 出力
-  src/stats.rs            記述統計・言語別ベースライン・相関（Phase 4）
-  src/model.rs            実験的な可読性モデル（利用者のラベルから学習するリッジ回帰。Phase 4）
-  src/report.rs           自己完結 HTML レポート（Phase 4）
+  src/ir.rs                 Common IR
+  src/error.rs              解析エラー
+  src/lang/                 Language Adapter（tree-sitter 汎用変換器 + 言語別 Mapping）
+  src/metrics/              Metric Engine（Calculator 群、定義レジストリ、定義の Markdown 生成）
+  src/analyze.rs            解析パイプライン（パス走査 → IR → メトリクス → 結果）
+  src/result.rs             解析結果の型（JSON 形式）
+  src/csv.rs                CSV 出力
+  src/stats.rs              記述統計・言語別ベースライン・相関
+  src/model.rs              実験的な可読性モデル（利用者のラベルから学習するリッジ回帰）
+  src/report.rs             自己完結 HTML レポート
 crates/srcmetrics-cli/      CLI（clap）と HTTP サーバ（axum。src/serve.rs, src/ui.html）
-tests/fixtures/           言語別フィクスチャ
+tests/fixtures/             言語別フィクスチャ
+docs/                       利用者向けドキュメント（VitePress、GitHub Pages）。docs/metrics/ はコードから生成
+design/                     開発者向け文書（本書、ADR、MEMO）
 ```
 
 依存方向は `lang → ir ← metrics` の一方向で、`metrics` は `lang` と tree-sitter を参照しない（`tests/engine.rs` で検査）。
 
-## 2. 処理の流れ
+## 3. 処理の流れ
 
 ```text
 analyze(path)
@@ -33,13 +61,13 @@ analyze(path)
   └─ AnalysisResult{run, project, files}
 ```
 
-## 3. Common IR（ADR-0003）
+## 4. Common IR（ADR-0003）
 
 | 型 | 内容 |
 |---|---|
 | `Program` | `files` |
 | `File` | `path, language, source, nodes(arena), root, tokens, functions` |
-| `Node` | `id, kind, parent, children, range` |
+| `Node` | `id, kind, parent, children, range, label`（label は call の呼び出し先名、logical の演算子） |
 | `Function` | `id, name(無名は None), parameters, node, body, range, doc` |
 | `Parameter` | `name, range` |
 | `Token` | `kind, text, range` |
@@ -49,7 +77,7 @@ analyze(path)
 - `TokenKind`: keyword, identifier, literal, operator, punctuation, comment
 - 補助: `File::function_nodes`（入れ子関数を除く関数内ノード）、`top_level_nodes`、`ancestors`、`tokens_in`（範囲内トークンのスライス）
 
-## 4. Language Adapter（ADR-0004）
+## 5. Language Adapter（ADR-0004）
 
 - `LanguageAdapter { language(), extensions(), to_ir(path, source) }`。実装は `TreeSitterAdapter` のみで、言語ごとの差分は `Mapping` テーブルに置く。
 - 変換は具象構文木を 1 回だけ反復的に走査する（深い式でもスタックを溢れさせない）。名前付きノードは IR ノード、葉（comment / literal に指定した型は部分木ごと）はトークンになる。
@@ -80,6 +108,7 @@ analyze(path)
 | else_field | else 節ノードがない grammar での else 部分のフィールド |
 | comments / literals / interpolations / identifiers | トークン分類。interpolations は literal 内の埋め込みコード |
 | name_fields | 名前を探すフィールドの順序 |
+| parameter_fields | 引数を持つフィールド（Go は receiver, parameters） |
 | decorators | ドキュメントと関数の間に書かれるノード型 |
 | docstring | 関数本体の先頭でドキュメントとなるリテラルのノード型 |
 | ignored_parameters | 引数とみなさないテキスト（C の void 等） |
@@ -92,12 +121,12 @@ analyze(path)
 
 Metric Engine は変更しない。
 
-## 5. Metric Engine
+## 6. Metric Engine
 
 - `Calculator { definitions(), compute(&Program) -> ProgramMetrics }`。各 Calculator は独立しており、互いの結果を参照しない。
 - `metrics::compute` が全 Calculator を実行し、スコープごとの `Metrics`（id → `MetricValue`、id 順）を併合する。
 - `MetricValue = Available(f64) | NotApplicable | Unsupported | Error(String)`（ADR-0005）。
-- 定義は各 Calculator の `DEFINITIONS` に PLAN §9 の全項目で記述し、`docs/METRICS.md` はそこから生成する（`tests/docs.rs` で同期を検査）。
+- 定義は各 Calculator の `DEFINITIONS` に、id・名前・説明・定義・スコープ・入力・計算方法・単位・言語依存性・制約・参考文献を記述する。利用者向けのメトリクス定義ページ（`docs/metrics/`）はそこから生成する（`tests/docs.rs` で同期を検査）。
 - 定義や計算方法を変えたら `DEFINITION_VERSION` を上げる。初回リリースまでの開発中は `0.1.0` のまま（公開済みの解析結果がないため）。
 
 ### 実装済み Calculator
@@ -134,58 +163,17 @@ Metric Engine は変更しない。
 
 1. `src/metrics/<name>.rs` に Calculator と `DEFINITIONS` を書き、`calculators()` に登録
 2. 手組み IR（`ir::builder`）で単体テストを書く
-3. `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs` で METRICS.md を再生成
+3. `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs` で `docs/metrics/` を再生成
 
-## 6. 解析結果（ADR-0010）
+## 7. 出力・CLI・HTTP API の実装上の決まり
 
-- `run`：project, repository, commit（git 管理外なら null）, tool_version, metric_definition_version, parsers（言語 → パーサ版）, timestamp（RFC 3339, UTC）
-- `project` / 各ファイル / 各関数：`metrics`（ID → 数値 or null）と `unavailable`（ID → `not_applicable` / `unsupported` / `error: ...`）
-- 各ファイル：`status` が `ok`（path, language, metrics, functions）または `error`（path, language, error）
-- 各関数：name（無名は null）, start_line, end_line, metrics
+利用方法と形式は利用者向けドキュメント（`docs/guide/`）に書く。ここには実装上の決まりだけを置く。
+
+- 結果の形式は ADR-0010、CSV は ADR-0016、統計は ADR-0018、モデルは ADR-0019、レポートは ADR-0020、HTTP API は ADR-0021
 - 有限でない数値（オーバーフロー等）は null と `error: value ... is not finite` にする
+- JSON は `float_roundtrip` で書き出し、読み戻したとき同じ値になる（P10）
 - パーサ版は Mapping の `grammar_crate` と `TREE_SITTER_VERSION` から作り、`Cargo.lock` と一致することをテストで検査する
-
-## 7. CLI
-
-```text
-srcmetrics analyze <PATH> [--project NAME] [-o FILE] [--format json|csv]   解析結果を出力（CSV は ADR-0016）
-srcmetrics metrics [--format json|markdown]                              メトリクス定義を出力（markdown は docs/METRICS.md と同一）
-srcmetrics stats <RESULT.json>... [--scope file|function]               記述統計・言語別ベースライン・相関（ADR-0018）
-srcmetrics report <RESULT.json> [-o FILE]                               自己完結 HTML レポート（ADR-0020）
-srcmetrics model train --labels LABELS.csv [--features ids] [--lambda L] [-o MODEL.json] <RESULT.json>...
-srcmetrics model predict --model MODEL.json <RESULT.json>...             実験的モデル（ADR-0019。既定の重みはない）
-srcmetrics serve [--bind 127.0.0.1] [--port 8080]                       HTTP API と Web UI（ADR-0021）
-```
-
-- 解析できなかったファイルがあれば、結果に含めたうえで stderr に件数と理由を出す（終了コードは 0）
-- パスが存在しない・未対応拡張子のファイルを直接指定した・結果 JSON でないファイルを渡した等は、終了コード 1 と対処方法付きのメッセージ
-
-### 典型的な使い方
-
-```sh
-srcmetrics analyze src -o result.json
-srcmetrics stats result.json --scope function > stats.json
-srcmetrics report result.json -o report.html
-# 人間の評価 labels.csv（path,function,score）があれば
-srcmetrics model train --labels labels.csv -o model.json result.json
-srcmetrics model predict --model model.json result.json
-```
-
-### HTTP API（`srcmetrics serve`）
-
-| メソッド・パス | 内容 |
-|---|---|
-| `GET /` | ソースを貼り付けて解析する UI |
-| `GET /api/metrics` | メトリクス定義（JSON） |
-| `POST /api/analyze` | `{"filename", "source"}` → 1 ファイルの解析結果（§6 と同じ形式）。未対応拡張子・構文エラーは 400 と `{"error"}` |
-
-既定では 127.0.0.1 だけで待ち受ける。認証はない。
-
-## 7.1 Phase 4 の分析機能
-
-- 統計（ADR-0018）：単位（ファイル／関数）ごとに n, missing, mean, sd, min, Q1, median, Q3, max。言語別にも同じ。全メトリクス対の Pearson / Spearman（両方の値がある単位のみ、3 単位未満・分散 0 は null）
-- モデル（ADR-0019）：ラベルの付いた単位でリッジ回帰を学習。特徴量は z 標準化し、学習時の R² と 5 分割交差検証の RMSE を記録。使えない特徴量（ラベル付き単位で null がある、定数）は理由付きで除外。ラベルがすべて同じ値、ラベルが単位と一意に対応しない等はエラー
-- レポート（ADR-0020）：実行メタデータ、プロジェクトのメトリクス、言語別中央値、ヒストグラム、関数メトリクスの Spearman ヒートマップ。外部リソースを読み込まない
+- CLI のエラーは終了コード 1 と、次に何をすべきかが分かるメッセージ。解析できなかったファイルは結果に含めたうえで stderr に件数と理由を出す（終了コード 0）
 
 ## 8. エラー
 
@@ -204,8 +192,10 @@ srcmetrics model predict --model model.json result.json
 | `src/**` の `#[cfg(test)]` | IR 補助関数、Calculator 単体（手組み IR） |
 | `tests/adapter.rs` | 言語別の IR 変換 |
 | `tests/engine.rs` | 定義と出力の整合、言語横断の等価性、Metric Engine の言語非依存性 |
-| `tests/docs.rs` | METRICS.md の同期 |
+| `tests/docs.rs` | `docs/metrics/`（メトリクス定義ページ）の同期 |
 | `tests/analyze.rs` | ディレクトリ解析、エラーファイルの記録、run メタデータ、JSON 往復 |
 | `tests/model.rs` | ラベルの照合、学習、予測 |
 | `crates/srcmetrics-cli/tests/cli.rs` | CLI の出力と終了コード |
 | `crates/srcmetrics-cli/tests/serve.rs` | HTTP API / UI（実際にサーバを起動） |
+
+ドキュメントサイトは `npm run docs:build` でビルドし、リンク切れがあれば失敗する。

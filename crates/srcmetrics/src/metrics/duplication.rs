@@ -1,4 +1,4 @@
-//! Duplication Metrics (PLAN.md §8.5, ADR-0009).
+//! Duplication Metrics (ADR-0009).
 
 use super::{
     Applicability::*, Calculator, MetricDefinition, MetricValue, Metrics, ProgramMetrics, Scope::*,

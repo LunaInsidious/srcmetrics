@@ -1,4 +1,4 @@
-//! Metric Engine invariants and cross-language equivalence (PLAN.md §6, §9, §19).
+//! Metric Engine invariants and cross-language equivalence (design principles P1, P2, P6, P9).
 
 use srcmetrics::ir::Program;
 use srcmetrics::lang::adapter_for_path;
@@ -103,7 +103,7 @@ fn same_algorithm_same_metrics_across_languages() {
     );
 }
 
-/// PLAN.md §19-2: the Metric Engine refers to the Common IR only.
+/// Design principle P2: the Metric Engine refers to the Common IR only.
 #[test]
 fn metric_engine_does_not_depend_on_parsers_or_languages() {
     let dir = format!("{}/src/metrics", env!("CARGO_MANIFEST_DIR"));

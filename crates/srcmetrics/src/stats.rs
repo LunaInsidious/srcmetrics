@@ -1,4 +1,4 @@
-//! Statistical analysis of analysis results (PLAN.md §20 Phase 4, ADR-0018).
+//! Statistical analysis of analysis results (ADR-0018).
 
 use crate::metrics::{self, Scope};
 use crate::result::{AnalysisResult, FileResult};

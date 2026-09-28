@@ -1,4 +1,4 @@
-//! Self-contained HTML report (PLAN.md §20 Phase 4, ADR-0020): no scripts, no external resources.
+//! Self-contained HTML report (ADR-0020): no scripts, no external resources.
 
 use crate::result::AnalysisResult;
 use crate::stats::{self, Report, Unit, UnitScope};

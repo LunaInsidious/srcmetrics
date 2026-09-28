@@ -1,4 +1,4 @@
-//! Size Metrics (PLAN.md §8.1).
+//! Size Metrics.
 //!
 //! Size metrics are textual: at function scope they include the text of nested functions.
 
