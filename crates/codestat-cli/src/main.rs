@@ -1,1 +1,118 @@
-fn main() {}
+//! codestat command-line interface.
+
+use clap::{Parser, Subcommand, ValueEnum};
+use codestat::analyze::analyze;
+use codestat::metrics;
+use codestat::result::{AnalysisResult, FileResult};
+use std::path::PathBuf;
+use std::process::ExitCode;
+
+#[derive(Parser)]
+#[command(
+    version,
+    about = "Language-independent source code readability metrics"
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Analyze a file or directory and print the result as JSON.
+    Analyze {
+        /// File or directory to analyze. Directories are walked respecting .gitignore.
+        path: PathBuf,
+        /// Project name recorded in the result (default: the directory name).
+        #[arg(long)]
+        project: Option<String>,
+        /// Write the result to this file instead of stdout.
+        #[arg(long, short)]
+        output: Option<PathBuf>,
+    },
+    /// List the metric definitions.
+    Metrics {
+        #[arg(long, value_enum, default_value_t = DefinitionFormat::Json)]
+        format: DefinitionFormat,
+    },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum DefinitionFormat {
+    Json,
+    Markdown,
+}
+
+fn main() -> ExitCode {
+    match run(Cli::parse().command) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(message) => {
+            eprintln!("error: {message}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run(command: Command) -> Result<(), String> {
+    match command {
+        Command::Analyze {
+            path,
+            project,
+            output,
+        } => {
+            let result = analyze(&path, project.as_deref()).map_err(|e| e.to_string())?;
+            warn_failed_files(&result);
+            write(output, &to_json(&result)?)
+        }
+        Command::Metrics { format } => {
+            let definitions = metrics::definitions();
+            let text = match format {
+                DefinitionFormat::Json => to_json(&definitions)?,
+                DefinitionFormat::Markdown => metrics::to_markdown(&definitions),
+            };
+            write(None, &text)
+        }
+    }
+}
+
+fn to_json(value: &impl serde::Serialize) -> Result<String, String> {
+    serde_json::to_string_pretty(value)
+        .map(|s| s + "\n")
+        .map_err(|e| format!("cannot serialize result: {e}"))
+}
+
+fn write(path: Option<PathBuf>, text: &str) -> Result<(), String> {
+    match path {
+        Some(p) => std::fs::write(&p, text).map_err(|e| {
+            format!(
+                "{}: {e}; check that the directory exists and is writable",
+                p.display()
+            )
+        }),
+        None => {
+            print!("{text}");
+            Ok(())
+        }
+    }
+}
+
+/// Failed files are part of the result; also report them on stderr so they are not missed.
+fn warn_failed_files(result: &AnalysisResult) {
+    let failed: Vec<_> = result
+        .files
+        .iter()
+        .filter_map(|f| match f {
+            FileResult::Error { error, .. } => Some(error),
+            FileResult::Ok { .. } => None,
+        })
+        .collect();
+    if !failed.is_empty() {
+        eprintln!(
+            "warning: {} file(s) could not be analyzed (status \"error\" in the result):",
+            failed.len()
+        );
+        for error in failed {
+            eprintln!("  {error}");
+        }
+    }
+}

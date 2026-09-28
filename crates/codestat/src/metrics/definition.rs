@@ -1,6 +1,9 @@
 //! Metric definitions (PLAN.md §9).
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use serde::Serialize;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Scope {
     Function,
     File,
@@ -8,14 +11,15 @@ pub enum Scope {
 }
 
 /// PLAN.md §6.1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Applicability {
     LanguageIndependent,
     PartiallyLanguageDependent,
     LanguageSpecific,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MetricDefinition {
     pub id: &'static str,
     pub name: &'static str,
