@@ -788,3 +788,276 @@ Nejmeh の NPATH は「条件式」と「then / else の本体」を区別して
 | Date | Status | Change |
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0012: 呼び出し関係（Dependency Metrics）は名前ベースで解決する
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** metrics, dependency, IR
+
+## Context
+
+### Problem
+
+PLAN §8.6 の Fan-in / Fan-out / Call Depth には「どの関数を呼んでいるか」が必要だが、IR の `call` ノードは呼び出し先を持たない。PLAN §8.6 は「完全な意味解析が困難な言語では、取得可能な範囲を明示する」としている。
+
+## Decision
+
+- IR の Node に `label: Option<String>` を追加する（ADR-0003 の拡張）。意味は種別ごとに決める
+  - `call`：呼び出し先の名前。Mapping の `callee_field`（多くの grammar で `function`）が指すノードの中の、**最後の identifier トークン**（`f(x)` → `f`、`a.b.c()` → `c`）
+  - `logical`：演算子のテキスト（`&&`, `or` 等。ADR-0014 で使う）
+  - その他：`None`
+- 呼び出しは**名前だけで**解決する。型・スコープ・import は見ない
+- メトリクス（関数スコープ。入れ子関数の呼び出しは入れ子関数のもの）
+  - Fan-out：その関数が呼ぶ異なる名前の数（プロジェクト外の関数も含む）
+  - Fan-in：その関数の名前を呼んでいる、プロジェクト内の異なる関数の数。同名の関数は区別できないので同じ値になる
+  - Call Depth：プロジェクト内の関数だけをたどったときの最長の呼び出し連鎖の辺の数。再帰（循環）は強連結成分にまとめ、成分の中の辺は数えない
+- Dependency Count（ファイル / プロジェクト）：`import` ノードの数
+- Call Count は Function Metrics の `function.call_count` を使い、重複定義しない
+
+### Rationale
+
+- 名前ベースなら全言語で同じ規則で計算でき、Mapping の追加は `callee_field` だけで済む
+- 強連結成分でまとめると、循環があっても Call Depth が一意に決まり、計算量も O(関数 + 呼び出し)
+
+## Alternatives Considered
+
+### 言語ごとの意味解析（型解決・import 解決）
+**Rejected because:** 言語ごとに大きな実装が必要で、§6 の言語非依存方針に反する
+
+### Call Depth を DFS で「訪問済みは 0」として計算
+**Cons** 循環があると、たどる順番によって値が変わる
+**Rejected because:** 再現性（§13.1）はあるが、値の意味が説明できない
+
+## Consequences
+
+### Negative
+- 同名のメソッド（例：多数のクラスの `run`）は区別されず、Fan-in が過大になる
+- 関数ポインタ・コールバック経由の呼び出しは、呼び出し先の名前が関数名と一致しない限り追えない
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0013: ドキュメントの判定
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** metrics, documentation, adapter
+
+## Context
+
+### Problem
+
+PLAN §8.7 は言語固有のドキュメント構文を共通の Documentation 概念に変換することを求めている。
+
+## Decision
+
+Adapter が `Function.doc`（ドキュメントの範囲）を設定する。
+
+- 汎用規則：関数の直前にあるコメントトークンの連続（間に空行を挟まない）で、最後のコメントが関数の開始行の前の行か同じ行で終わるもの
+  - `/** */`, `///`, `//`, `#` を区別しない（どのコメント構文も「関数の説明」として書かれうるため）
+- Mapping の `docstring: bool`：true の言語（Python）では、関数本体の最初の文が文字列リテラルだけの式文なら、それをドキュメントとする。直前コメントより docstring を優先する
+- メトリクス
+  - Documentation Count（ファイル / プロジェクト）：ドキュメントのある関数の数
+  - Documentation Ratio（ファイル / プロジェクト）：Documentation Count / 関数の数（関数がなければ not_applicable）
+  - Documentation LOC（関数）：ドキュメントの行数（なければ 0）
+  - Comment LOC / Comment Ratio は Size Metrics の `size.comment_loc` / `size.comment_ratio` を使い、重複定義しない
+
+### Rationale
+
+- 直前コメントという規則は C / Go / Java / JS / TS / Rust に共通して使える
+- Python の慣習的なドキュメントは docstring なので、それだけを Mapping のフラグで扱う
+
+## Alternatives Considered
+
+### ドキュメント専用の構文（`/**`, `///`）だけを数える
+**Cons** Go や C のように通常のコメントで関数を説明する慣習の言語で 0 になる
+**Rejected because:** 言語間で比較できない
+
+## Consequences
+
+### Negative
+- デコレータ（Python の `@...`）の上に書いたコメントは、関数の直前ではないのでドキュメントにならない
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0014: Cognitive Complexity の IR 上の定義
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** metrics, complexity
+
+## Context
+
+### Problem
+
+SonarSource の Cognitive Complexity を IR（NodeKind）だけで計算する規則を決める必要がある。
+
+## Decision
+
+関数ごと（入れ子関数は含めない）に以下を足す。`level` は関数内で外側にある「ネストを作る構造」の数（`branch` の連鎖の先頭、`loop`、`case`、`catch`、`conditional`）。
+
+| 構造 | 加算 |
+|---|---|
+| if 連鎖の先頭 `branch` | 1 + level |
+| 継続 `branch`（else if / elif） | 1 |
+| `else`（中身が継続 `branch` でないもの） | 1 |
+| `loop`, `catch`, `conditional` | 1 + level |
+| 連続する兄弟 `case` の並び（= 1 つの switch） | 1 + level（並びごとに 1 回） |
+| `logical` | 1（親が同じ演算子（label）の `logical` なら 0。`a && b && c` は 1、`a && b \|\| c` は 2） |
+| 自分と同じ名前を呼ぶ `call`（再帰） | 1 |
+
+- ファイル：関数の合計。プロジェクト：ファイルの合計
+
+### Rationale
+
+- 原典の「構造による加算」「ネストによる加算」「else 等の平坦な加算」を、既存の NodeKind と if 連鎖の規則（ADR-0007）で表現できる
+
+## Alternatives Considered
+
+### 原典どおり、入れ子関数（ラムダ）の複雑さを外側の関数に含める
+**Cons** 他のメトリクス（Cyclomatic 等）は入れ子関数を別に数えており、一貫しない
+**Rejected because:** 本システム内の一貫性を優先。定義書に差分を明記する
+
+## Consequences
+
+### Negative
+- ラベル付き break / continue、goto の加算は、IR が `jump` のラベルを持たないため行わない
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0015: 派生メトリクス（Maintainability Index と正規化値）は標準メトリクスから計算する
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** metrics, derived
+
+## Context
+
+### Problem
+
+Maintainability Index（MI）と §16 の正規化値は、他のメトリクス（Halstead Volume, Cyclomatic, SLOC 等）の組み合わせで決まる。各 Calculator は互いに独立させる方針（§12.2）なので、これらをどこで計算するかを決める必要がある。
+
+## Decision
+
+Metric Engine を 2 段階にする。
+
+1. 標準メトリクス：各 Calculator が IR から計算する（従来どおり）
+2. 派生メトリクス：標準メトリクスの値（`Metrics` の表）だけを入力とする関数で、各スコープ（関数・ファイル・プロジェクト）の表に追加する
+
+- 派生メトリクスは IR を見ない。入力のどれかが available でなければ not_applicable（入力が error なら error）
+- MI：`maintainability.index = 171 − 5.2·ln(V) − 0.23·CC − 16.2·ln(SLOC)`（V = halstead.volume, CC = complexity.cyclomatic, SLOC = size.sloc）。V と SLOC が正のときだけ計算する。関数・ファイルのスコープ
+  - このため `size.sloc` を関数スコープにも追加する
+- 正規化値（§16）は ID を `derived.` で始め、標準メトリクスと区別する
+  - `derived.cyclomatic_per_function` = complexity.cyclomatic / size.function_count
+  - `derived.tokens_per_loc` = size.token_count / size.loc
+  - `derived.statements_per_function` = size.statement_count / size.function_count
+  - `derived.duplicate_tokens_per_sloc` = duplication.duplicate_token_count / size.sloc
+  - スコープはファイルとプロジェクト
+
+### Rationale
+
+- 計算式が標準メトリクスの値の関数として明示され、定義書の Input 欄と一致する
+- Calculator 間の依存（実行順序）を作らずに済む
+
+## Alternatives Considered
+
+### MI の Calculator が Halstead / Cyclomatic / SLOC を IR から再計算する
+**Cons** 同じ計算が 2 か所で走り、定義が食い違う危険がある
+**Rejected because:** 値の出どころを 1 つにする方が安全
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0016: CSV 出力
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** output
+
+## Context
+
+### Problem
+
+PLAN §5 の出力に CSV がある。統計ツール（表計算、R、pandas）に直接読ませたい。
+
+## Decision
+
+- 1 行 = 1 つのスコープの値（project / file / function）。列は `scope, path, language, function, start_line, end_line, status, error` と、全メトリクス ID（定義順）
+- 値が null のセルは空。理由は JSON 出力の `unavailable` を参照する（CSV には書かない）
+- 解析に失敗したファイルは `status=error` と `error` 列だけを埋めた行
+- CSV のエスケープ（`,` `"` 改行を含むセルを `"` で囲み、`"` を `""` にする）は自前で書く。csv クレートは使わない（書き出しのみで、必要な処理が 10 行程度のため。ADR-0006）
+
+## Alternatives Considered
+
+### スコープごとに別ファイル
+**Cons** 1 コマンドで複数ファイルを出すと扱いが面倒
+**Rejected because:** scope 列で絞り込めば足りる
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0017: 対応言語の追加（Go, Java, JavaScript, Rust, C++）
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** parser, languages
+
+## Context
+
+### Problem
+
+PLAN §4 の残りの言語に対応する。
+
+## Decision
+
+各言語の公式 tree-sitter grammar クレート（tree-sitter-go, -java, -javascript, -rust, -cpp）を追加し、ADR-0004 の Mapping だけで対応する。Metric Engine は変更しない。
+
+- 各言語について `tests/fixtures/equivalence/classify.<ext>` を追加し、既存の等価テスト（Cyclomatic / Max Nesting が全言語で一致）に含める
+- 汎用規則で表せない言語の癖が出た場合は、Mapping 項目の追加として ADR-0004 を改訂する
+
+## Consequences
+
+### Negative
+- C++ はテンプレート・マクロにより C と同様に解析できないファイルがある（MEMO の C の事例と同じ）
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
