@@ -5,6 +5,7 @@
 
 mod c;
 mod go;
+mod java;
 mod python;
 mod treesitter;
 mod typescript;
@@ -30,6 +31,7 @@ static ADAPTERS: &[TreeSitterAdapter] = &[
     TreeSitterAdapter::new(&typescript::TYPESCRIPT),
     TreeSitterAdapter::new(&typescript::TSX),
     TreeSitterAdapter::new(&go::MAPPING),
+    TreeSitterAdapter::new(&java::MAPPING),
 ];
 
 pub fn adapters() -> impl Iterator<Item = &'static dyn LanguageAdapter> {

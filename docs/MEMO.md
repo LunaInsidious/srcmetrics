@@ -51,6 +51,8 @@ C / Python / TypeScript の Mapping を作成した際に気づいた、言語�
 - Python の docstring は `expression_statement` なので Statement として数えられる。
 - C の `for (int i = 0; ...)` の初期化子は `declaration` として Statement に数えられる。Python の `for` には相当する宣言がない。
 
+- Java の `case 1: case 2: 文` は 1 つの `switch_block_statement_group` になるため、case は 1 つと数える（C では 2 つ）。
+
 ### 気になる点 / TODO
 - Documentation（Phase 3）で、Python docstring をドキュメントとして扱う方法を決める必要がある。
 

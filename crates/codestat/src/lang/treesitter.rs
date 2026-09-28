@@ -232,11 +232,12 @@ impl<'a> Converter<'a> {
             .is_some_and(|op| self.mapping.logical_operators.contains(&self.text(op)))
     }
 
+    /// A case whose first token is the default keyword (C `default:`, Java `default ->`).
     fn is_default_case(&self, ts: tree_sitter::Node) -> bool {
-        let first = ts.child(0).map(|c| c.kind());
+        let first_leaf = std::iter::successors(Some(ts), |n| n.child(0)).last();
         self.mapping
             .default_case_keyword
-            .is_some_and(|kw| first == Some(kw))
+            .is_some_and(|kw| first_leaf.is_some_and(|leaf| leaf.kind() == kw))
     }
 
     fn push_token(&mut self, kind: TokenKind, bytes: std::ops::Range<usize>, range: SourceRange) {
@@ -316,7 +317,12 @@ impl<'a> Converter<'a> {
     /// Parameters come from a `parameters` list field, or a single `parameter` field
     /// (e.g. `x => x` in JavaScript). A function with neither has no parameters.
     fn parameters(&self, ts: tree_sitter::Node) -> Vec<Parameter> {
-        let nodes: Vec<_> = if let Some(list) = self.find_field(ts, "parameters") {
+        let nodes: Vec<_> = if let Some(single) = self
+            .find_field(ts, "parameters")
+            .filter(|p| self.is_identifier(p))
+        {
+            vec![single] // Java `x -> ...`
+        } else if let Some(list) = self.find_field(ts, "parameters") {
             let mut cursor = list.walk();
             list.named_children(&mut cursor)
                 .filter(|p| !self.mapping.comments.contains(&p.kind()))
@@ -345,7 +351,7 @@ impl<'a> Converter<'a> {
                 .collect()
         } else {
             vec![Parameter {
-                name: self.name_of(p),
+                name: self.parameter_name(p),
                 range: range(p),
             }]
         }
@@ -361,18 +367,33 @@ impl<'a> Converter<'a> {
             .find_map(|n| n.child_by_field_name(field))
     }
 
-    /// Follows name fields until reaching an identifier. When the chain ends on a node
-    /// without a name field (e.g. Python `x: int`, `*args`), its first identifier child is the name.
+    /// Follows name fields until reaching an identifier (function names, and parameters with name fields).
     fn name_of(&self, ts: tree_sitter::Node) -> Option<String> {
-        let is_identifier = |n: &tree_sitter::Node| self.mapping.identifiers.contains(&n.kind());
-        let last = std::iter::successors(Some(ts), |n| self.next_name_node(*n)).last()?;
-        let name = if is_identifier(&last) {
-            Some(last)
-        } else {
-            let mut cursor = last.walk();
-            last.named_children(&mut cursor).find(is_identifier)
-        };
-        name.map(|n| self.text(n).to_string())
+        std::iter::successors(Some(ts), |n| self.next_name_node(*n))
+            .find(|n| self.is_identifier(n))
+            .map(|n| self.text(n).to_string())
+    }
+
+    /// A parameter's name: via name fields, or else the last child that is an identifier or has a
+    /// name (Python `x: int` and `*args`, Java `String... xs`, where a type may come first).
+    fn parameter_name(&self, p: tree_sitter::Node) -> Option<String> {
+        let end = std::iter::successors(Some(p), |n| self.next_name_node(*n)).last()?;
+        if self.is_identifier(&end) {
+            return Some(self.text(end).to_string());
+        }
+        let mut cursor = end.walk();
+        let named: Vec<_> = end.named_children(&mut cursor).collect();
+        named.into_iter().rev().find_map(|c| {
+            if self.is_identifier(&c) {
+                Some(self.text(c).to_string())
+            } else {
+                self.name_of(c).filter(|_| self.next_name_node(c).is_some())
+            }
+        })
+    }
+
+    fn is_identifier(&self, n: &tree_sitter::Node) -> bool {
+        self.mapping.identifiers.contains(&n.kind())
     }
 
     fn next_name_node<'t>(&self, ts: tree_sitter::Node<'t>) -> Option<tree_sitter::Node<'t>> {

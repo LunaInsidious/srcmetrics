@@ -351,3 +351,24 @@ fn go_switch_default_is_not_a_case_and_closures_are_functions() {
     assert_eq!(count(&file, 0, NodeKind::Case), 2);
     assert_eq!(file.functions.len(), 2);
 }
+
+#[test]
+fn java_functions_parameters_and_cases() {
+    let file = parse("equivalence/classify.java");
+    assert_eq!(
+        names_and_arity(&file),
+        vec![("classify".to_string(), 2), ("max2".to_string(), 2)]
+    );
+    let file = parse_str(
+        "A.java",
+        "class A {\n  A(int x) {}\n  void f(int x, String... xs) {\n    switch (x) { case 1: break; case 2: break; default: }\n    switch (x) { case 1 -> g(); default -> h(); }\n    Runnable r = y -> {};\n  }\n}\n",
+    );
+    let names: Vec<_> = file.functions.iter().map(|f| f.name.clone()).collect();
+    assert_eq!(names, vec![Some("A".into()), Some("f".into()), None]);
+    assert_eq!(
+        param_names(&file, 1),
+        ["x", "xs"].map(|s| Some(s.to_string()))
+    );
+    assert_eq!(param_names(&file, 2), vec![Some("y".to_string())]);
+    assert_eq!(count(&file, 1, NodeKind::Case), 3);
+}
