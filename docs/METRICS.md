@@ -1,0 +1,217 @@
+# メトリクス定義書
+
+このファイルは `crates/codestat/src/metrics` の定義から生成される。直接編集しないこと。
+再生成: `UPDATE_DOCS=1 cargo test -p codestat --test docs`
+
+Metric Definition Version: `0.1.0`
+
+## `size.loc` — LOC
+
+Physical lines of code.
+
+| Item | Value |
+|---|---|
+| Definition | Number of lines in the file. |
+| Scope | file, project |
+| Input | File source text |
+| Calculation | Count of lines; a trailing newline does not start a new line. Project: sum over files. |
+| Unit | lines |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
+## `size.sloc` — SLOC
+
+Source lines of code.
+
+| Item | Value |
+|---|---|
+| Definition | Lines occupied by at least one non-comment token. |
+| Scope | file, project |
+| Input | File source text, Token ranges |
+| Calculation | A token spanning several lines (e.g. a multi-line string) occupies each of them. Project: sum. |
+| Unit | lines |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
+## `size.comment_loc` — Comment LOC
+
+Lines containing only comments.
+
+| Item | Value |
+|---|---|
+| Definition | Lines occupied by a comment token and by no other token. |
+| Scope | file, project |
+| Input | File source text, Token ranges |
+| Calculation | Lines with code and a trailing comment are SLOC, not Comment LOC. Project: sum. |
+| Unit | lines |
+| Language Applicability | language_independent |
+| Limitations | Documentation strings that are string literals (e.g. Python docstrings) count as SLOC. |
+| Reference | - |
+
+## `size.blank_loc` — Blank LOC
+
+Blank lines.
+
+| Item | Value |
+|---|---|
+| Definition | Whitespace-only lines not occupied by any token. |
+| Scope | file, project |
+| Input | File source text, Token ranges |
+| Calculation | Blank lines inside a multi-line comment or string are not blank. Project: sum. |
+| Unit | lines |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
+## `size.comment_ratio` — Comment Ratio
+
+Share of comment lines.
+
+| Item | Value |
+|---|---|
+| Definition | Comment LOC / LOC. |
+| Scope | file, project |
+| Input | size.comment_loc, size.loc |
+| Calculation | not_applicable when LOC is 0. Project: ratio of the sums. |
+| Unit | ratio |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
+## `size.statement_count` — Statement Count
+
+Number of statements.
+
+| Item | Value |
+|---|---|
+| Definition | Nodes of kind statement, declaration, branch, loop, return or jump. |
+| Scope | function, file, project |
+| Input | Node kinds |
+| Calculation | Function scope includes nested functions. Project: sum. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Languages differ in what is a statement (e.g. C for-loop initializer declarations count; Python has no equivalent). |
+| Reference | - |
+
+## `size.token_count` — Token Count
+
+Number of non-comment tokens.
+
+| Item | Value |
+|---|---|
+| Definition | Tokens of every kind except comment. |
+| Scope | function, file, project |
+| Input | Tokens |
+| Calculation | A string literal is one token. Function scope includes nested functions. Project: sum. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Token granularity follows each grammar (e.g. C `#include` is one token). |
+| Reference | - |
+
+## `size.function_count` — Function Count
+
+Number of functions.
+
+| Item | Value |
+|---|---|
+| Definition | Functions in the IR, including methods, nested and anonymous functions. |
+| Scope | file, project |
+| Input | Functions |
+| Calculation | Project: sum. |
+| Unit | count |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
+## `size.function_length` — Function Length
+
+Lines spanned by a function.
+
+| Item | Value |
+|---|---|
+| Definition | Last line - first line + 1 of the function's source range. |
+| Scope | function |
+| Input | Function source range |
+| Calculation | Includes the signature, blank and comment lines, and nested functions. |
+| Unit | lines |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
+## `size.avg_function_length` — Average Function Length
+
+Mean Function Length.
+
+| Item | Value |
+|---|---|
+| Definition | Mean of size.function_length over all functions. |
+| Scope | file, project |
+| Input | size.function_length |
+| Calculation | not_applicable when there are no functions. |
+| Unit | lines |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
+## `size.max_function_length` — Maximum Function Length
+
+Longest Function Length.
+
+| Item | Value |
+|---|---|
+| Definition | Maximum of size.function_length over all functions. |
+| Scope | file, project |
+| Input | size.function_length |
+| Calculation | not_applicable when there are no functions. |
+| Unit | lines |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
+## `complexity.cyclomatic` — Cyclomatic Complexity
+
+Number of linearly independent paths (McCabe).
+
+| Item | Value |
+|---|---|
+| Definition | 1 + number of decision points in a function. |
+| Scope | function, file, project |
+| Input | Node kinds: branch, loop, case, catch, logical, conditional |
+| Calculation | Function: 1 + decision nodes, excluding nested functions. Each `else if` / `elif`, each short-circuit operator (&&, \|\|, and, or), each ternary and each non-default case label is one decision. File: sum over its functions + decisions in top-level code. Project: sum over files. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Which constructs are decisions follows each language Mapping (e.g. Python comprehension `for`/`if` clauses count; Python `case _` counts as a case). |
+| Reference | McCabe, T. J. (1976). A Complexity Measure. IEEE TSE SE-2(4). |
+
+## `nesting.max_depth` — Maximum Nesting Depth
+
+Deepest nesting of control structures.
+
+| Item | Value |
+|---|---|
+| Definition | Maximum over control structures (branch, loop, case, catch) of 1 + the number of control structures enclosing it. |
+| Scope | function, file, project |
+| Input | Node kinds and parent links |
+| Calculation | `else if` / `elif` continue their if-chain and do not add a level. Nesting restarts at function boundaries. 0 when there is no control structure. File / Project: maximum. |
+| Unit | levels |
+| Language Applicability | language_independent |
+| Limitations | A branch directly inside a branch without a block (C `if (a) if (b) x;`) is treated as an if-chain continuation. |
+| Reference | - |
+
+## `nesting.avg_depth` — Average Nesting Depth
+
+Mean nesting level of statements.
+
+| Item | Value |
+|---|---|
+| Definition | Mean over statements of the number of control structures enclosing the statement. |
+| Scope | function, file, project |
+| Input | Node kinds and parent links |
+| Calculation | Statements as in size.statement_count. not_applicable when there are no statements. File / Project: mean over all their statements. |
+| Unit | levels |
+| Language Applicability | language_independent |
+| Limitations | Inherits the statement differences of size.statement_count. |
+| Reference | - |
+

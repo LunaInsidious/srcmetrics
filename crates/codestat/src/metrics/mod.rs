@@ -9,7 +9,7 @@ mod size;
 use crate::ir::{File, Function, Program};
 use std::collections::BTreeMap;
 
-pub use definition::{Applicability, MetricDefinition, Scope};
+pub use definition::{Applicability, DEFINITION_VERSION, MetricDefinition, Scope, to_markdown};
 
 /// A metric value, or the reason it has none (ADR-0005). Never conflates "0" with "not computed".
 #[derive(Debug, Clone, PartialEq)]
