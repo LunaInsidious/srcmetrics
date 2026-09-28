@@ -11,7 +11,9 @@ crates/codestat/          コアライブラリ（同期・ネットワーク非
   src/error.rs            解析エラー
   src/lang/               Language Adapter（tree-sitter 汎用変換器 + 言語別 Mapping）
   src/metrics/            Metric Engine（Calculator 群、定義レジストリ）
-crates/codestat-cli/      CLI
+  src/analyze.rs          解析パイプライン（パス走査 → IR → メトリクス → 結果）
+  src/result.rs           解析結果の型（JSON 形式）
+crates/codestat-cli/      CLI（clap）
 tests/fixtures/           言語別フィクスチャ
 ```
 
@@ -20,8 +22,11 @@ tests/fixtures/           言語別フィクスチャ
 ## 2. 処理の流れ
 
 ```text
-source ──adapter_for_path(拡張子)──▶ LanguageAdapter::to_ir ──▶ ir::File
-Program{files} ──metrics::compute──▶ ProgramMetrics{project, files[{metrics, functions[]}]}
+analyze(path)
+  ├─ 対象の列挙：ディレクトリは .gitignore を尊重して走査し、対応拡張子のファイルだけ（パス順）
+  ├─ source ──adapter_for_path(拡張子)──▶ LanguageAdapter::to_ir ──▶ ir::File（失敗は status=error として記録）
+  ├─ Program{成功したファイル} ──metrics::compute──▶ ProgramMetrics{project, files[{metrics, functions[]}]}
+  └─ AnalysisResult{run, project, files}
 ```
 
 ## 3. Common IR（ADR-0003）
@@ -76,8 +81,11 @@ Metric Engine は変更しない。
 | Calculator | メトリクス |
 |---|---|
 | SizeCalculator | size.loc, sloc, comment_loc, blank_loc, comment_ratio, statement_count, token_count, function_count, function_length, avg_function_length, max_function_length |
-| ComplexityCalculator | complexity.cyclomatic |
+| ComplexityCalculator | complexity.cyclomatic, branch_count, conditional_count, loop_count, return_count, jump_count, path_count |
 | NestingCalculator | nesting.max_depth, nesting.avg_depth |
+| HalsteadCalculator | halstead.unique_operators, unique_operands, total_operators, total_operands, vocabulary, length, volume, difficulty, effort, time, bugs |
+| FunctionCalculator | function.parameter_count, avg_parameter_count, max_parameter_count, expression_count, call_count |
+| DuplicationCalculator | duplication.duplicate_block_count, duplicate_token_count, duplication_ratio, max_duplicate_length |
 
 ### メトリクスの追加手順
 
@@ -85,16 +93,36 @@ Metric Engine は変更しない。
 2. 手組み IR（`ir::builder`）で単体テストを書く
 3. `UPDATE_DOCS=1 cargo test -p codestat --test docs` で METRICS.md を再生成
 
-## 6. エラー
+## 6. 解析結果（ADR-0010）
+
+- `run`：project, repository, commit（git 管理外なら null）, tool_version, metric_definition_version, parsers（言語 → パーサ版）, timestamp（RFC 3339, UTC）
+- `project` / 各ファイル / 各関数：`metrics`（ID → 数値 or null）と `unavailable`（ID → `not_applicable` / `unsupported` / `error: ...`）
+- 各ファイル：`status` が `ok`（path, language, metrics, functions）または `error`（path, language, error）
+- 各関数：name（無名は null）, start_line, end_line, metrics
+- 有限でない数値（オーバーフロー等）は null と `error: value ... is not finite` にする
+- パーサ版は Mapping の `grammar_crate` と `TREE_SITTER_VERSION` から作り、`Cargo.lock` と一致することをテストで検査する
+
+## 7. CLI
+
+```text
+codestat analyze <PATH> [--project NAME] [-o FILE]   解析結果を JSON で出力
+codestat metrics [--format json|markdown]            メトリクス定義を出力（markdown は docs/METRICS.md と同一）
+```
+
+- 解析できなかったファイルがあれば、結果に含めたうえで stderr に件数と理由を出す（終了コードは 0）
+- パスが存在しない・未対応拡張子のファイルを直接指定した等は、終了コード 1 と対処方法付きのメッセージ
+
+## 8. エラー
 
 | 種別 | 発生条件 | 利用者が次にすること |
 |---|---|---|
 | `UnsupportedLanguage` | 拡張子に対応する Adapter がない | 対応拡張子一覧（メッセージに表示）を確認 |
+| `Io` | パスが存在しない・読めない | パスと権限を確認 |
 | `Parse` | 構文木に ERROR / MISSING がある | 指摘位置の構文を直すか、拡張子と言語が合っているか確認 |
 | `IrConversion` | grammar の互換性など内部不整合 | 入力ファイルを添えて報告 |
 | `MetricValue::Error` | メトリクス計算中の不整合（例：トークンに覆われない行） | 入力ファイルを添えて報告 |
 
-## 7. テスト
+## 9. テスト
 
 | ファイル | 内容 |
 |---|---|
@@ -102,3 +130,5 @@ Metric Engine は変更しない。
 | `tests/adapter.rs` | 言語別の IR 変換 |
 | `tests/engine.rs` | 定義と出力の整合、言語横断の等価性、Metric Engine の言語非依存性 |
 | `tests/docs.rs` | METRICS.md の同期 |
+| `tests/analyze.rs` | ディレクトリ解析、エラーファイルの記録、run メタデータ、JSON 往復 |
+| `crates/codestat-cli/tests/cli.rs` | CLI の出力と終了コード |
