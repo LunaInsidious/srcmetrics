@@ -1,5 +1,7 @@
 //! codestat command-line interface.
 
+mod serve;
+
 use clap::{Parser, Subcommand, ValueEnum};
 use codestat::analyze::analyze;
 use codestat::result::{AnalysisResult, FileResult};
@@ -55,6 +57,15 @@ enum Command {
     Model {
         #[command(subcommand)]
         command: ModelCommand,
+    },
+    /// Serve the HTTP API and a minimal web UI (local use; no authentication).
+    Serve {
+        /// Address to listen on.
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: std::net::IpAddr,
+        /// Port to listen on (0 picks a free port).
+        #[arg(long, default_value_t = 8080)]
+        port: u16,
     },
     /// List the metric definitions.
     Metrics {
@@ -192,6 +203,7 @@ fn run(command: Command) -> Result<(), String> {
             let result = load_results(std::slice::from_ref(&result))?.remove(0);
             write(output, &codestat::report::to_html(&result))
         }
+        Command::Serve { bind, port } => serve::serve(std::net::SocketAddr::new(bind, port)),
         Command::Metrics { format } => {
             let definitions = metrics::definitions();
             let text = match format {

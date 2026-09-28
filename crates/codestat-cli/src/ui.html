@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codestat</title>
+<style>
+  :root { --bg: #fff; --fg: #222; --border: #ccc; --error: #b00020; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1b1b1b; --fg: #ddd; --border: #555; --error: #ff6b6b; } }
+  body { font-family: system-ui, sans-serif; margin: 16px; background: var(--bg); color: var(--fg); }
+  textarea { width: 100%; height: 16em; font-family: ui-monospace, monospace; box-sizing: border-box; }
+  input, textarea, button { background: var(--bg); color: var(--fg); border: 1px solid var(--border); }
+  table { border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+  td, th { border: 1px solid var(--border); padding: 2px 8px; text-align: right; }
+  td:first-child, th:first-child { text-align: left; }
+  .error { color: var(--error); }
+  .tables { overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>codestat</h1>
+<p>Paste source code and give it a file name; the extension selects the language.</p>
+<p><label>File name <input id="filename" value="example.py"></label>
+<button id="analyze">Analyze</button></p>
+<textarea id="source" spellcheck="false">def greet(name):
+    if name:
+        return "Hello, " + name
+    return "Hello"
+</textarea>
+<div id="output" class="tables"></div>
+<script>
+const output = document.getElementById("output");
+
+function cell(tag, text) {
+  const element = document.createElement(tag);
+  element.textContent = text;
+  return element;
+}
+
+function table(title, columns, rows) {
+  const section = document.createElement("section");
+  section.appendChild(cell("h2", title));
+  const t = document.createElement("table");
+  const header = document.createElement("tr");
+  columns.forEach(c => header.appendChild(cell("th", c)));
+  t.appendChild(header);
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    r.forEach(v => tr.appendChild(cell("td", v)));
+    t.appendChild(tr);
+  });
+  section.appendChild(t);
+  return section;
+}
+
+function show(value, reason) {
+  if (value !== null) return Number.isInteger(value) ? String(value) : value.toFixed(3);
+  return "null (" + reason + ")";
+}
+
+document.getElementById("analyze").addEventListener("click", async () => {
+  output.replaceChildren(cell("p", "Analyzing…"));
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filename: document.getElementById("filename").value,
+      source: document.getElementById("source").value,
+    }),
+  });
+  const body = await response.json();
+  if (!response.ok) {
+    const p = cell("p", body.error);
+    p.className = "error";
+    output.replaceChildren(p);
+    return;
+  }
+  const file = body.files[0];
+  const fileRows = Object.entries(file.metrics).map(([id, v]) => [id, show(v, file.unavailable[id])]);
+  const functions = file.functions;
+  const ids = functions.length ? Object.keys(functions[0].metrics) : [];
+  const functionRows = ids.map(id => [id, ...functions.map(f => show(f.metrics[id], f.unavailable[id]))]);
+  const names = functions.map(f => (f.name ?? "(anonymous)") + " :" + f.start_line);
+  output.replaceChildren(
+    table("File", ["metric", "value"], fileRows),
+    table("Functions", ["metric", ...names], functionRows),
+  );
+});
+</script>
+</body>
+</html>
