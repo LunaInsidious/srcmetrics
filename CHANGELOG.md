@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/) (before 1.0, a minor version may contain breaking changes).
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-09-29
 
 Metric explanations now live only in the documentation; the code keeps the metric ids and the
 scopes they are reported at.
@@ -28,9 +28,9 @@ scopes they are reported at.
 - Metric ids, scopes, values and the analysis result format (JSON / CSV). The metric definition
   version stays `0.1.0`.
 
-## [0.1.0] - 2026-09-28
+## [0.1.0] - 2026-09-29
 
 Initial release.
 
-[0.2.0]: https://github.com/LunaInsidious/srcmetrics/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/LunaInsidious/srcmetrics/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/LunaInsidious/srcmetrics/releases/tag/v0.1.0
