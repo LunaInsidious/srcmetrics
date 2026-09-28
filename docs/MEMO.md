@@ -45,7 +45,7 @@
 C / Python / TypeScript の Mapping を作成した際に気づいた、言語間の差異と既知の制約。
 
 ### 内容 / 観察結果
-- 文字列リテラルは部分木ごと 1 トークンにしている（ADR-0004）。そのため f-string（Python）や template string（TS）内の埋め込み式の識別子・演算子はトークンにならない。
+- ~~文字列リテラルは部分木ごと 1 トークンにしている。そのため f-string / template string 内の埋め込み式はトークンにならない。~~ → Phase 1 レビューで、埋め込み式が IR ノードごと消えて Complexity 等も過小評価されると判明。`interpolations` で解消（ADR-0004 改訂）。
 - Python のメソッドの `self` / `cls` は引数として数える。Java 等の暗黙の `this` とは数え方が異なる（Parameter Count は Partially Language Dependent）。
 - Python `match` の `case _:` はワイルドカードだが `case` として数える（C の `default` と異なり、構文上は通常の case と区別されないため）。
 - Python の docstring は `expression_statement` なので Statement として数えられる。

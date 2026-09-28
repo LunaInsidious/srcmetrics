@@ -80,6 +80,7 @@ pub static TYPESCRIPT: Mapping = Mapping {
     default_case_keyword: None,
     comments: &["comment"],
     literals: LITERALS,
+    interpolations: &["template_substitution"],
     identifiers: IDENTIFIERS,
     name_fields: &["name", "pattern"],
     ignored_parameters: &[],

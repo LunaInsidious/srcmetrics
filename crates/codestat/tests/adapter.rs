@@ -276,3 +276,43 @@ fn empty_file_has_no_tokens() {
         assert!(file.tokens.is_empty(), "{path}: {:?}", file.tokens);
     }
 }
+
+fn kind_count(file: &File, kind: NodeKind) -> usize {
+    file.nodes.iter().filter(|n| n.kind == kind).count()
+}
+
+#[test]
+fn code_inside_template_literals_is_analyzed() {
+    let file = parse_str("a.ts", "const s = `x${a ? f() : g(() => 1)}y`;\n");
+    assert_eq!(kind_count(&file, NodeKind::Conditional), 1);
+    assert_eq!(kind_count(&file, NodeKind::Call), 2);
+    assert_eq!(file.functions.len(), 1);
+    let literals: Vec<_> = file
+        .tokens
+        .iter()
+        .filter(|t| t.kind == TokenKind::Literal)
+        .map(|t| t.text.as_str())
+        .collect();
+    assert_eq!(literals, vec!["`x", "1", "y`"]);
+}
+
+#[test]
+fn code_inside_python_f_strings_is_analyzed() {
+    let file = parse_str("a.py", "s = f\"v={compute(x) if x else 0}!\"\n");
+    assert_eq!(kind_count(&file, NodeKind::Conditional), 1);
+    assert_eq!(kind_count(&file, NodeKind::Call), 1);
+    assert!(
+        file.tokens
+            .iter()
+            .any(|t| t.kind == TokenKind::Identifier && t.text == "compute")
+    );
+}
+
+#[test]
+fn tokens_are_in_source_order() {
+    let file = parse_str("a.ts", "const s = `a${b}c${d}e`;\n");
+    let offsets: Vec<_> = file.tokens.iter().map(|t| t.range.start.offset).collect();
+    let mut sorted = offsets.clone();
+    sorted.sort();
+    assert_eq!(offsets, sorted);
+}

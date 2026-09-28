@@ -58,6 +58,7 @@ pub static MAPPING: Mapping = Mapping {
         "false",
         "null",
     ],
+    interpolations: &[],
     identifiers: &[
         "identifier",
         "field_identifier",

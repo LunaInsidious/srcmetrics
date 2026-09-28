@@ -25,8 +25,10 @@ pub struct Mapping {
     pub default_case_keyword: Option<&'static str>,
     /// Node types that become a single comment token.
     pub comments: &'static [&'static str],
-    /// Node types that become a single literal token (their subtree is not tokenized further).
+    /// Node types that become literal tokens; their subtree is not walked, except for interpolations.
     pub literals: &'static [&'static str],
+    /// Node types of code embedded in a literal (e.g. `${...}`, f-string `{...}`), walked as code.
+    pub interpolations: &'static [&'static str],
     /// Leaf node types that become identifier tokens.
     pub identifiers: &'static [&'static str],
     /// Field names followed, in order, to find the identifier naming a function or parameter.
@@ -130,26 +132,23 @@ struct Converter<'a> {
 
 impl<'a> Converter<'a> {
     /// Walks the concrete syntax tree once, iteratively (deep expressions must not overflow the stack).
-    /// Named nodes become IR nodes; leaves (and whole comment / literal subtrees) become tokens.
+    /// Named nodes become IR nodes; leaves and comments become tokens. A literal becomes literal
+    /// tokens for its text, and only its interpolated code (e.g. `${...}`) is walked further.
     fn convert(mut self, path: &str, root: tree_sitter::Node<'a>) -> Result<File, AnalysisError> {
         let mut function_nodes = vec![];
         let mut stack: Vec<(tree_sitter::Node, Option<NodeId>)> = vec![(root, None)];
         while let Some((ts, parent)) = stack.pop() {
             let kind = ts.kind();
             if self.mapping.comments.contains(&kind) {
-                self.push_token(TokenKind::Comment, ts);
+                self.push_token(TokenKind::Comment, ts.byte_range(), range(ts));
                 continue;
             }
-            let atomic_literal = self.mapping.literals.contains(&kind);
-            // Zero-width leaves (e.g. the root of an empty file) carry no text and are not tokens.
-            if atomic_literal || (ts.child_count() == 0 && ts.start_byte() < ts.end_byte()) {
-                let token_kind = if atomic_literal {
-                    TokenKind::Literal
-                } else {
-                    self.classify_leaf(ts)
-                };
-                self.push_token(token_kind, ts);
-            }
+            let literal = self.mapping.literals.contains(&kind);
+            let children = if literal {
+                self.push_literal(ts)
+            } else {
+                self.push_leaf(ts)
+            };
             let ir_parent = if ts.is_named() {
                 let id = self.push_node(ts, parent);
                 if self.nodes[id.0].kind == NodeKind::Function {
@@ -159,12 +158,10 @@ impl<'a> Converter<'a> {
             } else {
                 parent
             };
-            if !atomic_literal {
-                let mut cursor = ts.walk();
-                let children: Vec<_> = ts.children(&mut cursor).collect();
-                stack.extend(children.into_iter().rev().map(|c| (c, ir_parent)));
-            }
+            stack.extend(children.into_iter().rev().map(|c| (c, ir_parent)));
         }
+        // Interpolated code is tokenized after its enclosing literal's text; restore source order.
+        self.tokens.sort_by_key(|t| t.range.start.offset);
         let functions = function_nodes
             .into_iter()
             .enumerate()
@@ -224,12 +221,51 @@ impl<'a> Converter<'a> {
             .is_some_and(|kw| first == Some(kw))
     }
 
-    fn push_token(&mut self, kind: TokenKind, ts: tree_sitter::Node) {
+    fn push_token(&mut self, kind: TokenKind, bytes: std::ops::Range<usize>, range: SourceRange) {
         self.tokens.push(Token {
             kind,
-            text: self.text(ts).into(),
-            range: range(ts),
+            text: self.source[bytes].into(),
+            range,
         });
+    }
+
+    /// Tokenizes a leaf (zero-width leaves such as an empty file's root carry no text and are
+    /// skipped) and returns the children to walk.
+    fn push_leaf(&mut self, ts: tree_sitter::Node<'a>) -> Vec<tree_sitter::Node<'a>> {
+        if ts.child_count() == 0 && ts.start_byte() < ts.end_byte() {
+            self.push_token(self.classify_leaf(ts), ts.byte_range(), range(ts));
+        }
+        let mut cursor = ts.walk();
+        ts.children(&mut cursor).collect()
+    }
+
+    /// Emits one literal token per stretch of text between interpolations, and returns the
+    /// interpolation children, which are walked as ordinary code.
+    fn push_literal(&mut self, ts: tree_sitter::Node<'a>) -> Vec<tree_sitter::Node<'a>> {
+        let mut cursor = ts.walk();
+        let interpolations: Vec<_> = ts
+            .named_children(&mut cursor)
+            .filter(|c| self.mapping.interpolations.contains(&c.kind()))
+            .collect();
+        let start = |n: &tree_sitter::Node| position(n.start_position(), n.start_byte());
+        let end = |n: &tree_sitter::Node| position(n.end_position(), n.end_byte());
+        let mut text_from = start(&ts);
+        let mut text = vec![];
+        for c in &interpolations {
+            text.push(SourceRange {
+                start: text_from,
+                end: start(c),
+            });
+            text_from = end(c);
+        }
+        text.push(SourceRange {
+            start: text_from,
+            end: end(&ts),
+        });
+        for r in text.into_iter().filter(|r| r.start.offset < r.end.offset) {
+            self.push_token(TokenKind::Literal, r.start.offset..r.end.offset, r);
+        }
+        interpolations
     }
 
     /// Generic token classification rule (ADR-0004).

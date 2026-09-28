@@ -346,7 +346,8 @@ Mapping {
   language, extensions, grammar,
   kinds:       &[(tree-sitter ノード種名, NodeKind)]   // 載っていない名前付きノードは other
   comments:    &[ノード種名]                           // comment トークンとして扱う
-  literals:    &[ノード種名]                           // 丸ごと 1 つの literal トークンとして扱う（文字列等）
+  literals:    &[ノード種名]                           // literal トークンとして扱う（文字列等）。部分木は走査しない
+  interpolations: &[ノード種名]                        // literal 内に埋め込まれたコード（`${...}`, f-string の `{...}`）。通常のコードとして走査する
   identifiers: &[ノード種名]                           // identifier トークンとして扱う
   ignored_parameters: &[テキスト]                      // 例: C の f(void)
 }
@@ -362,7 +363,7 @@ Mapping {
 Token は具象構文木の葉（comment / literal は部分木ごと）から作り、以下の汎用規則で分類する。
 
 1. `comments` に載っている → comment
-2. `literals` に載っている → literal
+2. `literals` に載っている → literal。ただし `interpolations` の子があれば、その前後の文字列部分をそれぞれ 1 つの literal トークンとし、埋め込みコードは通常どおり IR ノードとトークンにする
 3. `identifiers` に載っている → identifier
 4. テキストに英字または `_` を含む → keyword（`int`, `return`, C の `#include` 等）
 5. 区切り記号（`, ; ( ) [ ] { }`）→ punctuation
@@ -397,6 +398,7 @@ Token は具象構文木の葉（comment / literal は部分木ごと）から�
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
 | 2026-09-29 | Accepted | 実装に合わせ、名前・引数の抽出規則、keyword 判定（「含む」）、logical / default case の Mapping 項目を明記 |
+| 2026-09-29 | Accepted | Phase 1 レビュー指摘：template string / f-string 内のコードが IR から消えていたため `interpolations` を追加。幅 0 の葉はトークンにしない |
 
 ---
 
