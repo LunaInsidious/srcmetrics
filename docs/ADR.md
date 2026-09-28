@@ -1078,3 +1078,176 @@ PLAN §4 の残りの言語に対応する。
 | Date | Status | Change |
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0018: 統計分析（記述統計・言語別ベースライン・相関）
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** phase4, statistics
+
+## Context
+
+### Problem
+
+PLAN §20 Phase 4 の「統計分析」と §18 の「プロジェクト・言語別の統計的ベースライン」を実現する。入力は解析結果（ADR-0010 の JSON）とする。
+
+## Decision
+
+- 入力：1 つ以上の解析結果 JSON。分析単位（unit）はファイルまたは関数（`--scope`）
+- メトリクスごとの記述統計：n（値のある単位の数）、missing（null の数）、mean、標準偏差（不偏、n − 1）、min、Q1、median、Q3、max
+  - 分位点は線形補間（R の type 7 と同じ）
+  - n = 0 の統計値は null。n = 1 の標準偏差は null
+- 言語別ベースライン：上記を言語ごとにも計算する
+- 相関行列：全メトリクスの組について Pearson と Spearman（順位は同順位を平均順位にする）
+  - 両方の値がある単位だけを使う（pairwise complete）。使った単位数も出力する
+  - 単位数が 3 未満、またはどちらかの分散が 0 なら null
+- 出力：JSON
+- 数値計算ライブラリは使わず自前で実装する（平均・分位点・順位・相関は数十行で、依存を増やす理由がない。ADR-0006）
+
+### Rationale
+
+- 生の特徴量を保持したまま（§19-8）、後段の分析に必要な要約を再現可能に出す
+- pairwise complete は、メトリクスごとに not_applicable の出方が違う（例：関数のないファイル）ため
+
+## Alternatives Considered
+
+### 欠損のある単位を全メトリクスから除く（listwise）
+**Cons** 関数のないファイルが 1 つでもあると、関数系メトリクスのせいで他の相関からもその単位が消える
+**Rejected because:** データを無駄に捨てる
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0019: 可読性モデルは利用者のラベルから学習する実験的コンポーネントとする
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** phase4, model
+
+## Context
+
+### Problem
+
+PLAN §20 Phase 4 の「可読性モデル」。一方 PLAN §10 は、任意の重みによる単一スコアを標準機能にしないとしている。人間による可読性評価データは本リポジトリにない。
+
+## Decision
+
+- **既定の重み・既定のスコアは持たない**。モデルは、利用者が与えたラベル（人間の評価値など）から学習する場合にだけ作られる
+- 学習：リッジ回帰（特徴量は z 標準化、切片は正則化しない）。正規方程式をガウスの消去法（部分ピボット）で解く
+  - 正則化の強さ `lambda` は引数で指定する（既定値 1.0。値はモデルファイルに記録）
+  - 特徴量：指定したスコープ（file / function）のメトリクス。`--features` で指定しなければ、そのスコープの全メトリクスから「ラベル付きの単位のどれかで null のもの」「分散が 0 のもの」を除いたもの。除いた特徴量とその理由はモデルファイルに記録する
+- 評価：学習データでの R²、k 分割交差検証（k = 5、単位の並び順で決定的に分割）の RMSE
+- 出力：モデル JSON（特徴量、平均、標準偏差、係数、切片、lambda、評価値、除外した特徴量、実験的であることの注記）
+- 予測：モデル JSON と解析結果から、各単位のスコアを出す。特徴量が null の単位の予測値は null（理由付き）
+- ラベルの形式：CSV（`path,function,score`。`function` が空ならファイル単位）。関数は `path` と `function`（名前）で照合し、同じファイルに同名の関数が複数あればエラー
+- CSV の読み込みには `csv` クレートを使う（引用符・改行を含むセルを正しく読むのは自前の書き出し（ADR-0016）より複雑で、誤読すると学習結果が静かに壊れるため）
+
+### Rationale
+
+- §10 の「事前に重みを決められない」という理由をそのまま尊重しつつ、§18 の「人間による可読性評価データとの統合」「機械学習による可読性モデル」の入口を用意する
+- リッジ回帰は係数が解釈でき、メトリクス間の強い相関（多重共線性）にも安定する
+
+## Alternatives Considered
+
+### 文献の重みを使った既定スコア
+**Rejected because:** §10 に反する
+
+### 勾配ブースティング等の非線形モデル
+**Cons** 依存と実装量が大きく、係数の解釈ができない
+**Rejected because:** 実験の入口としては線形モデルで足りる
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0020: 可視化は自己完結の HTML レポートにする
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** phase4, visualization
+
+## Context
+
+### Problem
+
+PLAN §20 Phase 4 の「可視化」。オフライン実行（§13.2）を守る必要がある。
+
+## Decision
+
+- 解析結果 JSON から、1 つの HTML ファイルを生成する（CSS・SVG をインライン。外部の JavaScript・CSS・フォントを読み込まない）
+- 内容：実行メタデータ、プロジェクトのメトリクス表、メトリクスごとのヒストグラム（SVG）、相関ヒートマップ（Spearman、SVG）、言語別の中央値表
+- 統計値は ADR-0018 の実装を使う
+- グラフ描画ライブラリは使わず、SVG を文字列として組み立てる
+
+### Rationale
+
+- ファイル 1 つなので、オフラインで開け、共有も簡単
+- 必要な図は棒と矩形だけなので、ライブラリは不要
+
+## Alternatives Considered
+
+### Chart.js 等を CDN から読み込む
+**Rejected because:** オフラインで表示できない
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0021: API / UI は CLI クレートの最小 HTTP サーバとする
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** phase4, api, ui, dependencies
+
+## Context
+
+### Problem
+
+PLAN §20 Phase 4 の「API / UI」。範囲が広がりやすいので最小限に絞る。
+
+## Decision
+
+- `codestat serve [--bind 127.0.0.1] [--port 8080]`（既定はローカルのみで待ち受け）
+- エンドポイント
+  - `POST /api/analyze`：`{"filename": "a.py", "source": "..."}` → 1 ファイルの解析結果（ADR-0010 と同じ形式）。言語は filename の拡張子で決める
+  - `GET /api/metrics`：メトリクス定義
+  - `GET /`：ソースを貼り付けて解析結果を表示する 1 ページの UI（HTML は CLI バイナリに埋め込む）
+- エラー：未対応の拡張子・解析エラーは 400 と `{"error": "..."}`
+- コアに「ディスクを読まずにソース文字列を解析する」関数を追加し、ディレクトリ解析と同じ計算経路を使う
+- 依存：`axum` と `tokio` を CLI クレートにだけ追加する（ADR-0001：コアを非同期ランタイムから切り離す）
+
+### Rationale
+
+- axum は tokio 上の定番で、ルーティング・JSON の処理が少ないコードで書ける
+- 認証やプロジェクト管理は扱わない（ローカルでの利用を想定）
+
+## Alternatives Considered
+
+### std の TcpListener で HTTP を自前実装
+**Cons** HTTP の解析・エラー処理を自前で持つことになり、不具合の温床になる
+**Rejected because:** 依存を 1 つ増やす方が安全
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
