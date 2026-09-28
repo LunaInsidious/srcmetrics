@@ -2,7 +2,7 @@
 
 use super::common::{is_continuation, is_nesting, nesting_levels};
 use super::{
-    Applicability::*, Calculator, MetricDefinition, Metrics, ProgramMetrics, Scope::*, per_file,
+    Applicability::*, Calculator, Ja, MetricDefinition, Metrics, ProgramMetrics, Scope::*, per_file,
 };
 use crate::ir::{File, Function, Node, NodeKind, Program};
 
@@ -24,6 +24,14 @@ static DEFINITIONS: &[MetricDefinition] = &[MetricDefinition {
     limitations: "Nested functions (lambdas) are measured separately instead of adding to the enclosing \
                   function. Labelled break / continue and goto add nothing (jumps have no labels in the IR).",
     reference: "Campbell, G. A. (2018). Cognitive Complexity: A new way of measuring understandability. SonarSource.",
+    ja: Ja {
+        name: "Cognitive Complexity",
+        description: "関数の制御の流れの理解しにくさ（SonarSource）。",
+        definition: "直線的な流れを断ち切る構造ごとの加算を、ネストで重み付けした合計。",
+        input: "ノードの種類、親子関係、呼び出しと論理演算子のラベル",
+        calculation: "if の連鎖の先頭、ループ、catch、三項演算子、連続する case ラベル（switch）：1 + ネストのレベル。else if / elif と else：1。同じ論理演算子の並び：1。自分と同じ名前の呼び出し（再帰）：1。ネストのレベルは分岐、ループ、case、catch、三項演算子で深くなる。ファイル：関数の合計。プロジェクト：ファイルの合計。",
+        limitations: "入れ子関数（ラムダ）は外側の関数に加算せず、別に計測する。ラベル付きの break / continue や goto は加算しない（IR のジャンプはラベルを持たない）。",
+    },
 }];
 
 impl Calculator for CognitiveCalculator {

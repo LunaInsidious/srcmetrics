@@ -155,3 +155,26 @@ fn long_else_if_ladders_are_handled_in_linear_time() {
         started.elapsed()
     );
 }
+
+/// Every English text of a definition has a Japanese counterpart (ADR-0025).
+#[test]
+fn every_definition_is_translated_into_japanese() {
+    for d in metrics::definitions() {
+        let pairs = [
+            ("name", d.name, d.ja.name),
+            ("description", d.description, d.ja.description),
+            ("definition", d.definition, d.ja.definition),
+            ("input", d.input, d.ja.input),
+            ("calculation", d.calculation, d.ja.calculation),
+            ("limitations", d.limitations, d.ja.limitations),
+        ];
+        for (field, en, ja) in pairs {
+            assert_eq!(
+                en.is_empty(),
+                ja.is_empty(),
+                "{}: ja.{field} does not match the English text",
+                d.id
+            );
+        }
+    }
+}

@@ -34,7 +34,7 @@ srcmetrics stats result.json --scope function       # 統計（JSON）
 srcmetrics analyze src --format csv > metrics.csv   # プロジェクト・ファイル・関数ごとに 1 行
 ```
 
-各メトリクスの意味は[メトリクス定義](/metrics/)（英語）にあります。
+各メトリクスの意味は[メトリクス定義](/ja/metrics/)にあります。
 
 ## 次に読む
 

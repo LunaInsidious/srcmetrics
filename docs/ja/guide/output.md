@@ -56,7 +56,7 @@
 
 ### メトリクスの値と `null`
 
-`metrics` は[メトリクス ID](/metrics/) から数値または `null` への対応です。`null` には必ず `unavailable` に理由があります。
+`metrics` は[メトリクス ID](/ja/metrics/) から数値または `null` への対応です。`null` には必ず `unavailable` に理由があります。
 
 | 理由 | 意味 |
 |---|---|

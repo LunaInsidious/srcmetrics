@@ -4,8 +4,8 @@
 //! `size.comment_ratio`).
 
 use super::{
-    Applicability::*, Calculator, MetricDefinition, MetricValue, Metrics, ProgramMetrics, Scope::*,
-    per_file,
+    Applicability::*, Calculator, Ja, MetricDefinition, MetricValue, Metrics, ProgramMetrics,
+    Scope::*, per_file,
 };
 use crate::ir::{File, Program};
 
@@ -28,6 +28,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: PartiallyLanguageDependent,
         limitations: "Any comment style counts (not only `/**` or `///`).",
         reference: "",
+        ja: Ja {
+            name: "ドキュメント行数",
+            description: "関数のドキュメントの行数。",
+            definition: "関数の直前にコメントのまとまりがある（デコレータ・属性の上でもよい。間に空行がなく、行末コメントではない）か、docstring のある言語で本体が docstring で始まるとき、その関数はドキュメントがあるとする。",
+            input: "関数のドキュメントの範囲",
+            calculation: "ドキュメントがまたがる行数。ドキュメントがなければ 0。",
+            limitations: "どのコメントの書き方でもよい（`/**` や `///` に限らない）。",
+        },
     },
     MetricDefinition {
         id: "documentation.documented_function_count",
@@ -41,6 +49,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: PartiallyLanguageDependent,
         limitations: "Any comment style counts (not only `/**` or `///`).",
         reference: "",
+        ja: Ja {
+            name: "ドキュメントのある関数の数",
+            description: "ドキュメントのある関数の数。",
+            definition: "関数の直前にコメントのまとまりがある（デコレータ・属性の上でもよい。間に空行がなく、行末コメントではない）か、docstring のある言語で本体が docstring で始まるとき、その関数はドキュメントがあるとする。",
+            input: "関数のドキュメントの範囲",
+            calculation: "ドキュメントのある関数の数。プロジェクト：合計。",
+            limitations: "どのコメントの書き方でもよい（`/**` や `///` に限らない）。",
+        },
     },
     MetricDefinition {
         id: "documentation.documentation_ratio",
@@ -54,6 +70,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: PartiallyLanguageDependent,
         limitations: "Any comment style counts (not only `/**` or `///`).",
         reference: "",
+        ja: Ja {
+            name: "ドキュメント率",
+            description: "ドキュメントのある関数の割合。",
+            definition: "ドキュメントのある関数の数 / 関数の数。",
+            input: "関数のドキュメントの範囲",
+            calculation: "関数がなければ not_applicable。",
+            limitations: "どのコメントの書き方でもよい（`/**` や `///` に限らない）。",
+        },
     },
 ];
 

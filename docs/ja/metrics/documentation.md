@@ -1,0 +1,49 @@
+<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->
+
+# ドキュメント
+
+## ドキュメント行数 {#documentation-doc-loc}
+
+`documentation.doc_loc` — 関数のドキュメントの行数。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | 関数の直前にコメントのまとまりがある（デコレータ・属性の上でもよい。間に空行がなく、行末コメントではない）か、docstring のある言語で本体が docstring で始まるとき、その関数はドキュメントがあるとする。 |
+| スコープ | function |
+| 入力 | 関数のドキュメントの範囲 |
+| 計算方法 | ドキュメントがまたがる行数。ドキュメントがなければ 0。 |
+| 単位 | lines |
+| 言語依存性 | 部分的に言語に依存する |
+| 制約 | どのコメントの書き方でもよい（`/**` や `///` に限らない）。 |
+| 参考文献 | - |
+
+## ドキュメントのある関数の数 {#documentation-documented-function-count}
+
+`documentation.documented_function_count` — ドキュメントのある関数の数。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | 関数の直前にコメントのまとまりがある（デコレータ・属性の上でもよい。間に空行がなく、行末コメントではない）か、docstring のある言語で本体が docstring で始まるとき、その関数はドキュメントがあるとする。 |
+| スコープ | file, project |
+| 入力 | 関数のドキュメントの範囲 |
+| 計算方法 | ドキュメントのある関数の数。プロジェクト：合計。 |
+| 単位 | count |
+| 言語依存性 | 部分的に言語に依存する |
+| 制約 | どのコメントの書き方でもよい（`/**` や `///` に限らない）。 |
+| 参考文献 | - |
+
+## ドキュメント率 {#documentation-documentation-ratio}
+
+`documentation.documentation_ratio` — ドキュメントのある関数の割合。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | ドキュメントのある関数の数 / 関数の数。 |
+| スコープ | file, project |
+| 入力 | 関数のドキュメントの範囲 |
+| 計算方法 | 関数がなければ not_applicable。 |
+| 単位 | ratio |
+| 言語依存性 | 部分的に言語に依存する |
+| 制約 | どのコメントの書き方でもよい（`/**` や `///` に限らない）。 |
+| 参考文献 | - |
+

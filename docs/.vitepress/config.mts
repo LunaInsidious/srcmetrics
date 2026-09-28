@@ -4,21 +4,21 @@ import { defineConfig, type DefaultTheme } from 'vitepress'
 
 // User documentation (ADR-0023). Developer documents live in design/ and are not published.
 
-const metricsDir = fileURLToPath(new URL('../metrics', import.meta.url))
 
-// The metric reference pages are generated from the code (docs/metrics/). List them in the order
+// The metric reference pages are generated from the code (docs/metrics/, docs/ja/metrics/). List them in the order
 // the generated overview links to them, which is the definition order.
-function metricPages(): DefaultTheme.SidebarItem[] {
+function metricPages(prefix: string): DefaultTheme.SidebarItem[] {
+  const metricsDir = fileURLToPath(new URL(`..${prefix}/metrics`, import.meta.url))
   const overview = readFileSync(`${metricsDir}/index.md`, 'utf8')
   const groups = [...new Set([...overview.matchAll(/\]\(\.\/([a-z_]+)#/g)].map((m) => m[1]))]
   const files = readdirSync(metricsDir).filter((f) => f !== 'index.md')
   if (files.length !== groups.length) {
-    throw new Error('docs/metrics/ is out of date; regenerate with UPDATE_DOCS=1 cargo test -p srcmetrics --test docs')
+    throw new Error(`docs${prefix}/metrics/ is out of date; regenerate with UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`)
   }
   return groups.map((group) => {
     const title = readFileSync(`${metricsDir}/${group}.md`, 'utf8').match(/^# (.+)$/m)
-    if (!title) throw new Error(`docs/metrics/${group}.md has no title`)
-    return { text: title[1], link: `/metrics/${group}` }
+    if (!title) throw new Error(`docs${prefix}/metrics/${group}.md has no title`)
+    return { text: title[1], link: `${prefix}/metrics/${group}` }
   })
 }
 
@@ -39,7 +39,7 @@ function sidebar(prefix: string, labels: Record<string, string>): DefaultTheme.S
     },
     {
       text: labels.metrics,
-      items: [{ text: labels.overview, link: '/metrics/' }, ...metricPages()],
+      items: [{ text: labels.overview, link: `${prefix}/metrics/` }, ...metricPages(prefix)],
     },
   ]
 }
@@ -84,7 +84,7 @@ export default defineConfig({
       themeConfig: {
         nav: [
           { text: 'ガイド', link: '/ja/guide/getting-started' },
-          { text: 'メトリクス定義', link: '/metrics/' },
+          { text: 'メトリクス定義', link: '/ja/metrics/' },
         ],
         sidebar: sidebar('/ja', {
           guide: 'ガイド',
@@ -95,7 +95,7 @@ export default defineConfig({
           model: '可読性モデル',
           httpApi: 'HTTP API',
           languages: '対応言語と制約',
-          metrics: 'メトリクス定義（英語）',
+          metrics: 'メトリクス定義',
           overview: '一覧',
         }),
         outline: { label: '目次' },

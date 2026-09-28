@@ -1,7 +1,8 @@
 //! Duplication Metrics (ADR-0009).
 
 use super::{
-    Applicability::*, Calculator, MetricDefinition, MetricValue, Metrics, ProgramMetrics, Scope::*,
+    Applicability::*, Calculator, Ja, MetricDefinition, MetricValue, Metrics, ProgramMetrics,
+    Scope::*,
 };
 use crate::ir::{File, Program, TokenKind};
 use std::collections::HashMap;
@@ -23,6 +24,8 @@ const fn duplication(
     name: &'static str,
     definition: &'static str,
     unit: &'static str,
+    ja_name: &'static str,
+    ja_definition: &'static str,
 ) -> MetricDefinition {
     MetricDefinition {
         id,
@@ -36,6 +39,16 @@ const fn duplication(
         applicability: LanguageIndependent,
         limitations: LIMITATIONS,
         reference: "",
+        ja: Ja {
+            name: ja_name,
+            description: ja_definition,
+            definition: ja_definition,
+            input: "トークン（種類とテキスト）",
+            calculation: "トークンを正規化する（識別子 → $id、リテラル → $lit、コメントは除く）。正規化したトークン 50 個の\
+                          窓が 2 回以上現れたら、その窓のトークンを重複とする。重複トークンの最大の連続部分を 1 \
+                          ブロックとする。ファイル：同じファイル内の重複だけ。プロジェクト：全ファイルをまたいだ重複。",
+            limitations: "同じトークンの繰り返し（長い配列リテラルなど）も重複として数える。",
+        },
     }
 }
 
@@ -45,24 +58,32 @@ static DEFINITIONS: &[MetricDefinition] = &[
         "Duplicate Block Count",
         "Number of duplicated token runs.",
         "count",
+        "重複ブロック数",
+        "重複したトークンの連続部分の数。",
     ),
     duplication(
         "duplication.duplicate_token_count",
         "Duplicate Token Count",
         "Number of duplicated tokens.",
         "count",
+        "重複トークン数",
+        "重複したトークンの数。",
     ),
     duplication(
         "duplication.duplication_ratio",
         "Duplication Ratio",
         "Duplicate Token Count / non-comment tokens; not_applicable when there are no tokens.",
         "ratio",
+        "重複率",
+        "重複トークン数 / コメント以外のトークン数。トークンがなければ not_applicable。",
     ),
     duplication(
         "duplication.max_duplicate_length",
         "Maximum Duplicate Length",
         "Longest duplicated token run; 0 when there is none.",
         "tokens",
+        "最長の重複",
+        "最も長い重複したトークンの連続部分の長さ。なければ 0。",
     ),
 ];
 

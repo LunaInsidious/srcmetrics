@@ -10,8 +10,8 @@ hero:
       text: はじめる
       link: /ja/guide/getting-started
     - theme: alt
-      text: メトリクス定義（英語）
-      link: /metrics/
+      text: メトリクス定義
+      link: /ja/metrics/
     - theme: alt
       text: GitHub
       link: https://github.com/LunaInsidious/srcmetrics

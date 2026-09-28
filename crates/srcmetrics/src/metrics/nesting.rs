@@ -2,8 +2,8 @@
 
 use super::common::{is_continuation, is_nesting, is_statement, nesting_levels};
 use super::{
-    Applicability::*, Calculator, MetricDefinition, MetricValue, Metrics, ProgramMetrics, Scope::*,
-    per_file,
+    Applicability::*, Calculator, Ja, MetricDefinition, MetricValue, Metrics, ProgramMetrics,
+    Scope::*, per_file,
 };
 use crate::ir::{File, Node, Program};
 
@@ -25,6 +25,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         limitations: "A branch directly inside a branch without a block (C `if (a) if (b) x;`) is treated \
                       as an if-chain continuation.",
         reference: "",
+        ja: Ja {
+            name: "最大ネスト深さ",
+            description: "制御構造の最も深い入れ子。",
+            definition: "制御構造（branch, loop, case, catch）ごとの「1 + それを囲む制御構造の数」の最大値。",
+            input: "ノードの種類と親子関係",
+            calculation: "`else if` / `elif` は if の連鎖の続きで、レベルを増やさない。関数の境界でネストはリセットする。制御構造がなければ 0。ファイル / プロジェクト：最大値。",
+            limitations: "ブロックを挟まずに分岐の中に直接ある分岐（C の `if (a) if (b) x;`）は、if の連鎖の続きとして扱う。",
+        },
     },
     MetricDefinition {
         id: "nesting.avg_depth",
@@ -39,6 +47,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "Inherits the statement differences of size.statement_count.",
         reference: "",
+        ja: Ja {
+            name: "平均ネスト深さ",
+            description: "文のネストのレベルの平均。",
+            definition: "文ごとの「それを囲む制御構造の数」の平均。",
+            input: "ノードの種類と親子関係",
+            calculation: "文の定義は size.statement_count と同じ。文がなければ not_applicable。ファイル / プロジェクト：含まれるすべての文の平均。",
+            limitations: "size.statement_count と同じく、文の数え方の言語差を受け継ぐ。",
+        },
     },
 ];
 

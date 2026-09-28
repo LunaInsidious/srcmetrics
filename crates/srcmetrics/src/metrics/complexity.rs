@@ -2,7 +2,7 @@
 
 use super::common::{is_continuation, is_decision};
 use super::{
-    Applicability::*, Calculator, MetricDefinition, Metrics, ProgramMetrics, Scope::*, per_file,
+    Applicability::*, Calculator, Ja, MetricDefinition, Metrics, ProgramMetrics, Scope::*, per_file,
 };
 use crate::ir::{File, Function, Node, NodeId, NodeKind, Program};
 
@@ -10,7 +10,13 @@ pub struct ComplexityCalculator;
 
 const ALL_SCOPES: &[super::Scope] = &[Function, File, Project];
 
-const fn count(id: &'static str, name: &'static str, definition: &'static str) -> MetricDefinition {
+const fn count(
+    id: &'static str,
+    name: &'static str,
+    definition: &'static str,
+    ja_name: &'static str,
+    ja_definition: &'static str,
+) -> MetricDefinition {
     MetricDefinition {
         id,
         name,
@@ -23,6 +29,14 @@ const fn count(id: &'static str, name: &'static str, definition: &'static str) -
         applicability: PartiallyLanguageDependent,
         limitations: "Which constructs map to each node kind follows each language Mapping.",
         reference: "",
+        ja: Ja {
+            name: ja_name,
+            description: ja_definition,
+            definition: ja_definition,
+            input: "ノードの種類",
+            calculation: "関数：入れ子関数を除く。ファイル：ファイル全体。プロジェクト：ファイルの合計。",
+            limitations: "どの構文がどのノードの種類になるかは、言語ごとの Mapping に従う。",
+        },
     }
 }
 
@@ -43,27 +57,49 @@ static DEFINITIONS: &[MetricDefinition] = &[
         limitations: "Which constructs are decisions follows each language Mapping (e.g. Python comprehension \
                       `for`/`if` clauses count; Python `case _:` and Rust `_ =>` count as cases).",
         reference: "McCabe, T. J. (1976). A Complexity Measure. IEEE TSE SE-2(4).",
+        ja: Ja {
+            name: "Cyclomatic Complexity",
+            description: "線形独立な経路の数（McCabe）。",
+            definition: "1 + 関数内の判定点の数。",
+            input: "ノードの種類：branch, loop, case, catch, logical, conditional",
+            calculation: "関数：1 + 判定ノードの数（入れ子関数を除く）。`else if` / `elif`、短絡演算子（&&, ||, and, or）、三項演算子、default 以外の case ラベルがそれぞれ 1 つの判定点。ファイル：関数の合計 + トップレベルのコードの判定点。プロジェクト：ファイルの合計。",
+            limitations: "何を判定点とするかは言語ごとの Mapping に従う（例：Python の内包表記の `for` / `if` は数える。Python の `case _:` と Rust の `_ =>` は case として数える）。",
+        },
     },
     count(
         "complexity.branch_count",
         "Branch Count",
         "Number of branch nodes (if, else if, elif) plus non-default case labels.",
+        "分岐の数",
+        "分岐ノード（if, else if, elif）と default 以外の case ラベルの数。",
     ),
     count(
         "complexity.conditional_count",
         "Conditional Count",
         "Number of conditional (ternary) expressions.",
+        "三項演算子の数",
+        "条件式（三項演算子）の数。",
     ),
-    count("complexity.loop_count", "Loop Count", "Number of loops."),
+    count(
+        "complexity.loop_count",
+        "Loop Count",
+        "Number of loops.",
+        "ループの数",
+        "ループの数。",
+    ),
     count(
         "complexity.return_count",
         "Return Count",
         "Number of return statements.",
+        "return の数",
+        "return 文の数。",
     ),
     count(
         "complexity.jump_count",
         "Jump Count",
         "Number of jumps: break, continue, goto and throw / raise.",
+        "ジャンプの数",
+        "ジャンプ（break, continue, goto, throw / raise）の数。",
     ),
     MetricDefinition {
         id: "complexity.path_count",
@@ -80,6 +116,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         limitations: "Not Nejmeh's NPATH: short-circuit operators and early exits (return, jump) do not \
                       change the count.",
         reference: "Nejmeh, B. A. (1988). NPATH: a measure of execution path complexity. CACM 31(2) (related, not identical).",
+        ja: Ja {
+            name: "経路数",
+            description: "関数を通る非循環な実行経路の数。",
+            definition: "各ループを 0 回または 1 回通るとしたときの、関数を通る経路の数。",
+            input: "ノードの種類と木構造",
+            calculation: "並んだ子は掛け算。if の連鎖は各分岐の和（最後の else がなければ +1）。ループと三項演算子は子の積 + 1。連続する case ラベルや catch 節は経路の和 + 1。入れ子関数は 1。",
+            limitations: "Nejmeh の NPATH とは異なる：短絡演算子や早期の脱出（return, jump）は数に影響しない。",
+        },
     },
 ];
 

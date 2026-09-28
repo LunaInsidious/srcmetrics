@@ -1,0 +1,64 @@
+<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->
+
+# 依存関係
+
+## Fan-out {#dependency-fan-out}
+
+`dependency.fan_out` — 関数が呼び出す関数の種類の数。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | 関数内の呼び出しノードの、呼び出し先の名前の種類の数。 |
+| スコープ | function |
+| 入力 | 呼び出しノードと呼び出し先のラベル |
+| 計算方法 | 入れ子関数による呼び出しは除く。プロジェクト外で定義された呼び出し先も含む。呼び出し先の名前がない呼び出し（例：`f()()`）は数えない。 |
+| 単位 | count |
+| 言語依存性 | 部分的に言語に依存する |
+| 制約 | 呼び出しは呼び出し先の名前だけで解決する（型・スコープ・import は見ない）。 |
+| 参考文献 | Henry, S. & Kafura, D. (1981). Software Structure Metrics Based on Information Flow. IEEE TSE SE-7(5). |
+
+## Fan-in {#dependency-fan-in}
+
+`dependency.fan_in` — 関数を呼び出しているプロジェクト内の関数の数。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | 呼び出し先の名前がこの関数の名前と同じ呼び出しを持つ、プロジェクト内の関数の数。 |
+| スコープ | function |
+| 入力 | 呼び出しノードと呼び出し先のラベル、関数名 |
+| 計算方法 | 同じ名前の関数は同じ値になる。無名関数は 0。 |
+| 単位 | count |
+| 言語依存性 | 部分的に言語に依存する |
+| 制約 | 名前だけで解決するため、別のクラスの同名メソッドを区別できず、fan-in を多めに数える。 |
+| 参考文献 | Henry, S. & Kafura, D. (1981). Software Structure Metrics Based on Information Flow. IEEE TSE SE-7(5). |
+
+## 呼び出しの深さ {#dependency-call-depth}
+
+`dependency.call_depth` — プロジェクト内の関数をたどる最長の呼び出しの連鎖。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | 関数名を頂点とするプロジェクトの呼び出しグラフで、強連結成分（再帰）をまとめたうえでの、その関数の名前からの最長経路の辺の数。 |
+| スコープ | function |
+| 入力 | 呼び出しノードと呼び出し先のラベル、関数名 |
+| 計算方法 | 頂点はプロジェクト内の関数の名前で、ある名前はその名前の全関数が呼ぶものを呼ぶ。強連結成分の中の辺は数えない。無名関数は 1 + 呼び出している名前の最大の深さ。プロジェクト内の関数を呼ばなければ 0。 |
+| 単位 | calls |
+| 言語依存性 | 部分的に言語に依存する |
+| 制約 | 名前だけで解決するため、同じ名前の関数は同じ値になる。 |
+| 参考文献 | - |
+
+## 依存の数 {#dependency-dependency-count}
+
+`dependency.dependency_count` — import / include 宣言の数。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | import の種類のノード。 |
+| スコープ | file, project |
+| 入力 | import ノード |
+| 計算方法 | 文法が別々の宣言として表す import の項目ごとに 1 と数える（例：Go の import spec ごと）。プロジェクト：合計。 |
+| 単位 | count |
+| 言語依存性 | 部分的に言語に依存する |
+| 制約 | import の粒度は言語によって異なる（Python の `from a import b, c` は 1 つの import）。 |
+| 参考文献 | - |
+

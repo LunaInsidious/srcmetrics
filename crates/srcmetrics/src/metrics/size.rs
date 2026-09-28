@@ -4,7 +4,7 @@
 
 use super::common::{LineClass, is_statement, line_classes};
 use super::{
-    Applicability::*, Calculator, FileMetrics, MetricDefinition, MetricValue, Metrics,
+    Applicability::*, Calculator, FileMetrics, Ja, MetricDefinition, MetricValue, Metrics,
     ProgramMetrics, Scope::*,
 };
 use crate::ir::{File, Function, Program, TokenKind};
@@ -26,6 +26,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "",
         reference: "",
+        ja: Ja {
+            name: "LOC",
+            description: "物理行数。",
+            definition: "ファイルの行数。",
+            input: "ファイルのソーステキスト",
+            calculation: "行数を数える。末尾の改行は新しい行を作らない。プロジェクト：ファイルの合計。",
+            limitations: "",
+        },
     },
     MetricDefinition {
         id: "size.sloc",
@@ -40,6 +48,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "",
         reference: "",
+        ja: Ja {
+            name: "SLOC",
+            description: "ソースコードの行数。",
+            definition: "コメント以外のトークンが 1 つ以上ある行。",
+            input: "ファイルのソーステキスト、トークンの範囲",
+            calculation: "複数行にわたるトークン（複数行の文字列など）は、またがるすべての行を占める。関数：関数の範囲の行（入れ子関数を含む）。プロジェクト：合計。",
+            limitations: "",
+        },
     },
     MetricDefinition {
         id: "size.comment_loc",
@@ -53,6 +69,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "Documentation strings that are string literals (e.g. Python docstrings) count as SLOC.",
         reference: "",
+        ja: Ja {
+            name: "コメント行数",
+            description: "コメントだけの行。",
+            definition: "コメントトークンがあり、他のトークンがない行。",
+            input: "ファイルのソーステキスト、トークンの範囲",
+            calculation: "コードと行末コメントがある行は SLOC で、コメント行ではない。プロジェクト：合計。",
+            limitations: "文字列リテラルとして書くドキュメント（Python の docstring など）は SLOC に数える。",
+        },
     },
     MetricDefinition {
         id: "size.blank_loc",
@@ -66,6 +90,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "",
         reference: "",
+        ja: Ja {
+            name: "空行数",
+            description: "空行。",
+            definition: "どのトークンにも占められていない、空白だけの行。",
+            input: "ファイルのソーステキスト、トークンの範囲",
+            calculation: "複数行のコメントや文字列の中の空行は空行ではない。プロジェクト：合計。",
+            limitations: "",
+        },
     },
     MetricDefinition {
         id: "size.comment_ratio",
@@ -79,6 +111,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "",
         reference: "",
+        ja: Ja {
+            name: "コメント率",
+            description: "コメント行の割合。",
+            definition: "コメント行数 / LOC。",
+            input: "size.comment_loc, size.loc",
+            calculation: "LOC が 0 なら not_applicable。プロジェクト：合計どうしの比。",
+            limitations: "",
+        },
     },
     MetricDefinition {
         id: "size.statement_count",
@@ -92,6 +132,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: PartiallyLanguageDependent,
         limitations: "Languages differ in what is a statement (e.g. C for-loop initializer declarations count; Python has no equivalent).",
         reference: "",
+        ja: Ja {
+            name: "文の数",
+            description: "文の数。",
+            definition: "statement, declaration, branch, loop, return, jump の種類のノード。",
+            input: "ノードの種類",
+            calculation: "関数スコープは入れ子関数を含む。プロジェクト：合計。",
+            limitations: "何を文とみなすかは言語によって異なる（例：C の for の初期化子の宣言は数えるが、Python には相当するものがない）。",
+        },
     },
     MetricDefinition {
         id: "size.token_count",
@@ -105,6 +153,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: PartiallyLanguageDependent,
         limitations: "Token granularity follows each grammar (e.g. C `#include` is one token).",
         reference: "",
+        ja: Ja {
+            name: "トークン数",
+            description: "コメント以外のトークンの数。",
+            definition: "コメント以外のすべての種類のトークン。",
+            input: "トークン",
+            calculation: "文字列リテラルは 1 トークン。関数スコープは入れ子関数を含む。プロジェクト：合計。",
+            limitations: "トークンの粒度は各言語の文法に従う（例：C の `#include` は 1 トークン）。",
+        },
     },
     MetricDefinition {
         id: "size.function_count",
@@ -118,6 +174,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "",
         reference: "",
+        ja: Ja {
+            name: "関数の数",
+            description: "関数の数。",
+            definition: "IR 上の関数。メソッド、入れ子の関数、無名関数を含む。",
+            input: "関数",
+            calculation: "プロジェクト：合計。",
+            limitations: "",
+        },
     },
     MetricDefinition {
         id: "size.function_length",
@@ -131,6 +195,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "",
         reference: "",
+        ja: Ja {
+            name: "関数の長さ",
+            description: "関数がまたがる行数。",
+            definition: "関数のソース範囲の、最終行 − 先頭行 + 1。",
+            input: "関数のソース範囲",
+            calculation: "シグネチャ、空行、コメント行、入れ子関数を含む。",
+            limitations: "",
+        },
     },
     MetricDefinition {
         id: "size.avg_function_length",
@@ -144,6 +216,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "",
         reference: "",
+        ja: Ja {
+            name: "平均関数長",
+            description: "関数の長さの平均。",
+            definition: "全関数の size.function_length の平均。",
+            input: "size.function_length",
+            calculation: "関数がなければ not_applicable。",
+            limitations: "",
+        },
     },
     MetricDefinition {
         id: "size.max_function_length",
@@ -157,6 +237,14 @@ static DEFINITIONS: &[MetricDefinition] = &[
         applicability: LanguageIndependent,
         limitations: "",
         reference: "",
+        ja: Ja {
+            name: "最大関数長",
+            description: "最も長い関数の長さ。",
+            definition: "全関数の size.function_length の最大値。",
+            input: "size.function_length",
+            calculation: "関数がなければ not_applicable。",
+            limitations: "",
+        },
     },
 ];
 

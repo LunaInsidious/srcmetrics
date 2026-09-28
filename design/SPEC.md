@@ -126,7 +126,7 @@ Metric Engine は変更しない。
 - `Calculator { definitions(), compute(&Program) -> ProgramMetrics }`。各 Calculator は独立しており、互いの結果を参照しない。
 - `metrics::compute` が全 Calculator を実行し、スコープごとの `Metrics`（id → `MetricValue`、id 順）を併合する。
 - `MetricValue = Available(f64) | NotApplicable | Unsupported | Error(String)`（ADR-0005）。
-- 定義は各 Calculator の `DEFINITIONS` に、id・名前・説明・定義・スコープ・入力・計算方法・単位・言語依存性・制約・参考文献を記述する。利用者向けのメトリクス定義ページ（`docs/metrics/`）はそこから生成する（`tests/docs.rs` で同期を検査）。
+- 定義は各 Calculator の `DEFINITIONS` に、id・名前・説明・定義・スコープ・入力・計算方法・単位・言語依存性・制約・参考文献を記述する。日本語の各欄は同じ定義の `ja` に書く（ADR-0025。英語に値がある欄の日本語が空ならテストが失敗する）。利用者向けのメトリクス定義ページ（英語 `docs/metrics/`、日本語 `docs/ja/metrics/`）はそこから生成する（`tests/docs.rs` で同期を検査）。
 - 定義や計算方法を変えたら `DEFINITION_VERSION` を上げる。初回リリースまでの開発中は `0.1.0` のまま（公開済みの解析結果がないため）。
 
 ### 実装済み Calculator
@@ -163,7 +163,7 @@ Metric Engine は変更しない。
 
 1. `src/metrics/<name>.rs` に Calculator と `DEFINITIONS` を書き、`calculators()` に登録
 2. 手組み IR（`ir::builder`）で単体テストを書く
-3. `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs` で `docs/metrics/` を再生成
+3. `ja` に日本語の定義を書き、`UPDATE_DOCS=1 cargo test -p srcmetrics --test docs` で `docs/metrics/` と `docs/ja/metrics/` を再生成
 
 ## 7. 出力・CLI・HTTP API の実装上の決まり
 
@@ -192,7 +192,7 @@ Metric Engine は変更しない。
 | `src/**` の `#[cfg(test)]` | IR 補助関数、Calculator 単体（手組み IR） |
 | `tests/adapter.rs` | 言語別の IR 変換 |
 | `tests/engine.rs` | 定義と出力の整合、言語横断の等価性、Metric Engine の言語非依存性 |
-| `tests/docs.rs` | `docs/metrics/`（メトリクス定義ページ）の同期 |
+| `tests/docs.rs` | `docs/metrics/`, `docs/ja/metrics/`（メトリクス定義ページ）の同期 |
 | `tests/analyze.rs` | ディレクトリ解析、エラーファイルの記録、run メタデータ、JSON 往復 |
 | `tests/model.rs` | ラベルの照合、学習、予測 |
 | `crates/srcmetrics-cli/tests/cli.rs` | CLI の出力と終了コード |

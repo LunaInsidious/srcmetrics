@@ -1,6 +1,6 @@
 //! Derived metrics (ADR-0015, design principle P8): computed from standard metric values only.
 
-use super::{Applicability::*, MetricDefinition, MetricValue, Metrics, Scope};
+use super::{Applicability::*, Ja, MetricDefinition, MetricValue, Metrics, Scope};
 
 /// A derived metric: its definition and how to compute it from the standard metrics of a scope.
 struct Derivation {
@@ -15,6 +15,7 @@ const fn ratio(
     name: &'static str,
     definition: &'static str,
     input: &'static str,
+    ja_name: &'static str,
     compute: fn(&Metrics) -> MetricValue,
 ) -> Derivation {
     Derivation {
@@ -30,6 +31,14 @@ const fn ratio(
             applicability: PartiallyLanguageDependent,
             limitations: "A normalization: its choice of denominator affects comparisons.",
             reference: "",
+            ja: Ja {
+                name: ja_name,
+                description: definition,
+                definition,
+                input,
+                calculation: "分母が 0 か、入力が得られない場合は not_applicable。",
+                limitations: "正規化の一種で、分母の選び方が比較の結果に影響する。",
+            },
         },
         compute,
     }
@@ -49,6 +58,14 @@ static DERIVATIONS: &[Derivation] = &[
             applicability: PartiallyLanguageDependent,
             limitations: "Inherits the limitations of its inputs; the coefficients were fitted on 1990s code.",
             reference: "Oman, P. & Hagemeister, J. (1992). Metrics for assessing a software system's maintainability. ICSM.",
+            ja: Ja {
+                name: "Maintainability Index",
+                description: "保守性の合成指標（上限のない元の式）。",
+                definition: "MI = 171 - 5.2 * ln(V) - 0.23 * CC - 16.2 * ln(SLOC)。",
+                input: "halstead.volume (V), complexity.cyclomatic (CC), size.sloc (SLOC)",
+                calculation: "V > 0 かつ SLOC > 0 のときだけ計算する（それ以外は not_applicable）。0〜100 に換算しない。",
+                limitations: "入力のメトリクスの制約を受け継ぐ。係数は 1990 年代のコードで求められたもの。",
+            },
         },
         compute: maintainability_index,
     },
@@ -57,6 +74,7 @@ static DERIVATIONS: &[Derivation] = &[
         "Cyclomatic Complexity per Function",
         "complexity.cyclomatic / size.function_count.",
         "complexity.cyclomatic, size.function_count",
+        "関数あたりの Cyclomatic Complexity",
         |m| divide(m, "complexity.cyclomatic", "size.function_count"),
     ),
     ratio(
@@ -64,6 +82,7 @@ static DERIVATIONS: &[Derivation] = &[
         "Tokens per LOC",
         "size.token_count / size.loc.",
         "size.token_count, size.loc",
+        "LOC あたりのトークン数",
         |m| divide(m, "size.token_count", "size.loc"),
     ),
     ratio(
@@ -71,6 +90,7 @@ static DERIVATIONS: &[Derivation] = &[
         "Statements per Function",
         "size.statement_count / size.function_count.",
         "size.statement_count, size.function_count",
+        "関数あたりの文の数",
         |m| divide(m, "size.statement_count", "size.function_count"),
     ),
     ratio(
@@ -78,6 +98,7 @@ static DERIVATIONS: &[Derivation] = &[
         "Duplicate Tokens per SLOC",
         "duplication.duplicate_token_count / size.sloc.",
         "duplication.duplicate_token_count, size.sloc",
+        "SLOC あたりの重複トークン数",
         |m| divide(m, "duplication.duplicate_token_count", "size.sloc"),
     ),
 ];

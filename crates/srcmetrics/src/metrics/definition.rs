@@ -35,6 +35,19 @@ pub struct MetricDefinition {
     pub applicability: Applicability,
     pub limitations: &'static str,
     pub reference: &'static str,
+    /// Japanese texts (ADR-0025). Empty exactly where the English text is empty.
+    pub ja: Ja,
+}
+
+/// The Japanese texts of a metric definition.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Ja {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub definition: &'static str,
+    pub input: &'static str,
+    pub calculation: &'static str,
+    pub limitations: &'static str,
 }
 
 /// Version of the metric definitions (design principle P10). Bump when any definition or calculation changes.

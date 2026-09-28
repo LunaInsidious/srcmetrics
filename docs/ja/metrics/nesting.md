@@ -1,0 +1,34 @@
+<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->
+
+# ネスト
+
+## 最大ネスト深さ {#nesting-max-depth}
+
+`nesting.max_depth` — 制御構造の最も深い入れ子。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | 制御構造（branch, loop, case, catch）ごとの「1 + それを囲む制御構造の数」の最大値。 |
+| スコープ | function, file, project |
+| 入力 | ノードの種類と親子関係 |
+| 計算方法 | `else if` / `elif` は if の連鎖の続きで、レベルを増やさない。関数の境界でネストはリセットする。制御構造がなければ 0。ファイル / プロジェクト：最大値。 |
+| 単位 | levels |
+| 言語依存性 | 言語に依存しない |
+| 制約 | ブロックを挟まずに分岐の中に直接ある分岐（C の `if (a) if (b) x;`）は、if の連鎖の続きとして扱う。 |
+| 参考文献 | - |
+
+## 平均ネスト深さ {#nesting-avg-depth}
+
+`nesting.avg_depth` — 文のネストのレベルの平均。
+
+| 項目 | 内容 |
+|---|---|
+| 定義 | 文ごとの「それを囲む制御構造の数」の平均。 |
+| スコープ | function, file, project |
+| 入力 | ノードの種類と親子関係 |
+| 計算方法 | 文の定義は size.statement_count と同じ。文がなければ not_applicable。ファイル / プロジェクト：含まれるすべての文の平均。 |
+| 単位 | levels |
+| 言語依存性 | 言語に依存しない |
+| 制約 | size.statement_count と同じく、文の数え方の言語差を受け継ぐ。 |
+| 参考文献 | - |
+

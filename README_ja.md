@@ -29,7 +29,7 @@ let result = srcmetrics::analyze::analyze_source("example.py", "def f(x):\n    r
 ## リンク
 
 - [はじめに](https://lunainsidious.github.io/srcmetrics/ja/guide/getting-started)
-- [メトリクス定義（英語）](https://lunainsidious.github.io/srcmetrics/metrics/)
+- [メトリクス定義](https://lunainsidious.github.io/srcmetrics/ja/metrics/)
 - [対応言語と制約](https://lunainsidious.github.io/srcmetrics/ja/guide/languages)
 - [API ドキュメント（docs.rs）](https://docs.rs/srcmetrics)
 - 開発者向け文書：[design/](https://github.com/LunaInsidious/srcmetrics/tree/main/design)

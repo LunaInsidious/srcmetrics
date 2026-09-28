@@ -1,26 +1,65 @@
 //! Markdown rendering of the metric definitions: one document for `srcmetrics metrics --format
-//! markdown`, and the metric reference pages of the documentation site (docs/metrics/).
+//! markdown`, and the metric reference pages of the documentation site (`docs/metrics/` in English,
+//! `docs/ja/metrics/` in Japanese; ADR-0025).
 
-use super::definition::{DEFINITION_VERSION, MetricDefinition, Scope};
+use super::definition::{Applicability, DEFINITION_VERSION, MetricDefinition, Scope};
 
-/// All definitions as one Markdown document.
+/// Language of the rendered documentation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lang {
+    En,
+    Ja,
+}
+
+/// The texts of a definition in one language.
+struct Texts {
+    name: &'static str,
+    description: &'static str,
+    definition: &'static str,
+    input: &'static str,
+    calculation: &'static str,
+    limitations: &'static str,
+}
+
+fn texts(d: &MetricDefinition, lang: Lang) -> Texts {
+    match lang {
+        Lang::En => Texts {
+            name: d.name,
+            description: d.description,
+            definition: d.definition,
+            input: d.input,
+            calculation: d.calculation,
+            limitations: d.limitations,
+        },
+        Lang::Ja => Texts {
+            name: d.ja.name,
+            description: d.ja.description,
+            definition: d.ja.definition,
+            input: d.ja.input,
+            calculation: d.ja.calculation,
+            limitations: d.ja.limitations,
+        },
+    }
+}
+
+/// All definitions as one Markdown document (English).
 pub fn to_markdown(definitions: &[&MetricDefinition]) -> String {
     let mut out =
         format!("# Metric definitions\n\nMetric definition version: `{DEFINITION_VERSION}`\n\n");
     for d in definitions {
-        out += &section(d);
+        out += &section(d, Lang::En);
     }
     out
 }
 
 /// The metric reference pages as (file name, content): `index.md` with an overview table, and one
 /// page per metric group (the id prefix, e.g. `complexity.md`).
-pub fn reference_pages(definitions: &[&MetricDefinition]) -> Vec<(String, String)> {
-    let mut pages = vec![("index.md".to_string(), overview(definitions))];
+pub fn reference_pages(definitions: &[&MetricDefinition], lang: Lang) -> Vec<(String, String)> {
+    let mut pages = vec![("index.md".to_string(), overview(definitions, lang))];
     for group in groups(definitions) {
-        let mut page = format!("{GENERATED}\n# {}\n\n", title(group));
+        let mut page = format!("{GENERATED}\n# {}\n\n", title(group, lang));
         for d in definitions.iter().filter(|d| group_of(d) == group) {
-            page += &section(d);
+            page += &section(d, lang);
         }
         pages.push((format!("{group}.md"), page));
     }
@@ -30,13 +69,26 @@ pub fn reference_pages(definitions: &[&MetricDefinition]) -> Vec<(String, String
 const GENERATED: &str = "<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; \
                          run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->\n";
 
-fn overview(definitions: &[&MetricDefinition]) -> String {
+fn overview(definitions: &[&MetricDefinition], lang: Lang) -> String {
+    let (title, intro, header) = match lang {
+        Lang::En => (
+            "Metrics",
+            "Every metric is reported separately under its id, at the scopes listed below. A value that \
+             cannot be computed is `null`, with the reason in `unavailable`; it is never 0.\n\n\
+             Metric definition version: `{version}` (recorded in every analysis result).",
+            "| Metric | Name | Scopes | Unit |",
+        ),
+        Lang::Ja => (
+            "メトリクス定義",
+            "各メトリクスは、下の表のスコープで、ID ごとに個別に出力されます。計算できない値は 0 ではなく `null` \
+             になり、理由が `unavailable` に入ります。\n\n\
+             メトリクス定義のバージョン：`{version}`（すべての解析結果に記録されます）。",
+            "| メトリクス | 名前 | スコープ | 単位 |",
+        ),
+    };
     let mut out = format!(
-        "{GENERATED}\n# Metrics\n\n\
-         Every metric is reported separately under its id, at the scopes listed below. A value that \
-         cannot be computed is `null`, with the reason in `unavailable`; it is never 0.\n\n\
-         Metric definition version: `{DEFINITION_VERSION}` (recorded in every analysis result).\n\n\
-         | Metric | Name | Scopes | Unit |\n|---|---|---|---|\n"
+        "{GENERATED}\n# {title}\n\n{}\n\n{header}\n|---|---|---|---|\n",
+        intro.replace("{version}", DEFINITION_VERSION)
     );
     for d in definitions {
         out += &format!(
@@ -44,7 +96,7 @@ fn overview(definitions: &[&MetricDefinition]) -> String {
             d.id,
             group_of(d),
             anchor(d.id),
-            cell(d.name),
+            cell(texts(d, lang).name),
             cell(&scopes(d)),
             cell(d.unit)
         );
@@ -52,24 +104,66 @@ fn overview(definitions: &[&MetricDefinition]) -> String {
     out
 }
 
-fn section(d: &MetricDefinition) -> String {
-    format!(
-        "## {} {{#{}}}\n\n`{}` — {}\n\n| Item | Value |\n|---|---|\n\
-         | Definition | {} |\n| Scope | {} |\n| Input | {} |\n| Calculation | {} |\n| Unit | {} |\n\
-         | Language Applicability | {} |\n| Limitations | {} |\n| Reference | {} |\n\n",
-        d.name,
+fn section(d: &MetricDefinition, lang: Lang) -> String {
+    let t = texts(d, lang);
+    let labels = match lang {
+        Lang::En => [
+            "Item",
+            "Value",
+            "Definition",
+            "Scope",
+            "Input",
+            "Calculation",
+            "Unit",
+            "Language Applicability",
+            "Limitations",
+            "Reference",
+        ],
+        Lang::Ja => [
+            "項目",
+            "内容",
+            "定義",
+            "スコープ",
+            "入力",
+            "計算方法",
+            "単位",
+            "言語依存性",
+            "制約",
+            "参考文献",
+        ],
+    };
+    let rows = [
+        t.definition.to_string(),
+        scopes(d),
+        t.input.to_string(),
+        t.calculation.to_string(),
+        d.unit.to_string(),
+        applicability(d.applicability, lang).to_string(),
+        t.limitations.to_string(),
+        d.reference.to_string(),
+    ];
+    let mut out = format!(
+        "## {} {{#{}}}\n\n`{}` — {}\n\n| {} | {} |\n|---|---|\n",
+        t.name,
         anchor(d.id),
         d.id,
-        d.description,
-        cell(d.definition),
-        cell(&scopes(d)),
-        cell(d.input),
-        cell(d.calculation),
-        cell(d.unit),
-        d.applicability.as_str(),
-        cell(d.limitations),
-        cell(d.reference),
-    )
+        t.description,
+        labels[0],
+        labels[1]
+    );
+    for (label, value) in labels[2..].iter().zip(rows) {
+        out += &format!("| {label} | {} |\n", cell(&value));
+    }
+    out + "\n"
+}
+
+fn applicability(a: Applicability, lang: Lang) -> &'static str {
+    match (lang, a) {
+        (Lang::En, _) => a.as_str(),
+        (Lang::Ja, Applicability::LanguageIndependent) => "言語に依存しない",
+        (Lang::Ja, Applicability::PartiallyLanguageDependent) => "部分的に言語に依存する",
+        (Lang::Ja, Applicability::LanguageSpecific) => "特定の言語に固有",
+    }
 }
 
 fn group_of(d: &MetricDefinition) -> &'static str {
@@ -89,10 +183,28 @@ fn groups(definitions: &[&MetricDefinition]) -> Vec<&'static str> {
     groups
 }
 
-fn title(group: &str) -> String {
-    let mut chars = group.chars();
-    let first = chars.next().expect("group names are not empty");
-    first.to_uppercase().chain(chars).collect()
+fn title(group: &str, lang: Lang) -> String {
+    let japanese = match group {
+        "size" => "規模",
+        "complexity" => "複雑さ",
+        "nesting" => "ネスト",
+        "halstead" => "Halstead",
+        "function" => "関数",
+        "duplication" => "重複",
+        "dependency" => "依存関係",
+        "documentation" => "ドキュメント",
+        "maintainability" => "保守性",
+        "derived" => "派生メトリクス",
+        other => panic!("metric group {other} has no Japanese title; add it here"),
+    };
+    match lang {
+        Lang::Ja => japanese.to_string(),
+        Lang::En => {
+            let mut chars = group.chars();
+            let first = chars.next().expect("group names are not empty");
+            first.to_uppercase().chain(chars).collect()
+        }
+    }
 }
 
 fn anchor(id: &str) -> String {
