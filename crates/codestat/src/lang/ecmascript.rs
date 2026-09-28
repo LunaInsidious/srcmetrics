@@ -86,6 +86,8 @@ pub static TYPESCRIPT: Mapping = Mapping {
     interpolations: &["template_substitution"],
     identifiers: IDENTIFIERS,
     name_fields: &["name", "pattern"],
+    decorators: &["decorator"],
+    docstring: None,
     ignored_parameters: &[],
 };
 

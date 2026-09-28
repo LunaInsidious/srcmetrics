@@ -480,3 +480,54 @@ fn logical_nodes_are_labelled_with_the_operator() {
     let file = parse_str("a.c", "int x = a && b || c;\n");
     assert_eq!(labels(&file, NodeKind::Logical), vec!["||", "&&"]);
 }
+
+fn doc_lines(file: &File) -> Vec<Option<(usize, usize)>> {
+    file.functions
+        .iter()
+        .map(|f| f.doc.map(|d| (d.first_line(), d.last_line())))
+        .collect()
+}
+
+#[test]
+fn documentation_is_found_in_every_language() {
+    for ext in ["c", "py", "ts", "js", "go", "java", "rs", "cpp"] {
+        let file = parse(&format!("equivalence/classify.{ext}"));
+        assert!(
+            file.functions.iter().all(|f| f.doc.is_some()),
+            "{ext}: {:?}",
+            doc_lines(&file)
+        );
+    }
+}
+
+#[test]
+fn preceding_comment_block_is_documentation() {
+    let file = parse_str("a.c", "int x;\n// one\n// two\nint f(void) { return 0; }\n");
+    assert_eq!(doc_lines(&file), vec![Some((2, 3))]);
+}
+
+#[test]
+fn separated_or_trailing_comments_are_not_documentation() {
+    let file = parse_str(
+        "a.c",
+        "// far\n\nint f(void) { return 0; }\nint x; // trailing\nint g(void) { return 0; }\n",
+    );
+    assert_eq!(doc_lines(&file), vec![None, None]);
+}
+
+#[test]
+fn python_docstring_takes_precedence() {
+    let file = parse_str(
+        "a.py",
+        "# comment\ndef f():\n    \"\"\"Doc\n    string.\"\"\"\n    return 1\n",
+    );
+    assert_eq!(doc_lines(&file), vec![Some((3, 4))]);
+}
+
+#[test]
+fn comments_above_decorators_and_attributes_are_documentation() {
+    let file = parse_str("a.py", "# doc\n@decorator\ndef f():\n    return 1\n");
+    assert_eq!(doc_lines(&file), vec![Some((1, 1))]);
+    let file = parse_str("a.rs", "/// doc\n#[inline]\nfn f() {}\n");
+    assert_eq!(doc_lines(&file), vec![Some((1, 1))]);
+}

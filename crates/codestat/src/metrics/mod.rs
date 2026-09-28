@@ -4,6 +4,7 @@ mod common;
 mod complexity;
 mod definition;
 mod dependency;
+mod documentation;
 mod duplication;
 mod function;
 mod halstead;
@@ -150,6 +151,7 @@ pub fn calculators() -> Vec<Box<dyn Calculator>> {
         Box::new(function::FunctionCalculator),
         Box::new(duplication::DuplicationCalculator),
         Box::new(dependency::DependencyCalculator),
+        Box::new(documentation::DocumentationCalculator),
     ]
 }
 

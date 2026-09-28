@@ -38,6 +38,12 @@ pub struct Mapping {
     pub identifiers: &'static [&'static str],
     /// Field names followed, in order, to find the identifier naming a function or parameter.
     pub name_fields: &'static [&'static str],
+    /// Node types written between a function's documentation and the function itself
+    /// (Python decorators, Rust attributes); skipped when looking for documentation (ADR-0013).
+    pub decorators: &'static [&'static str],
+    /// Literal node type that documents a function when it is the first statement of its body
+    /// (Python docstrings). Takes precedence over a preceding comment (ADR-0013).
+    pub docstring: Option<&'static str>,
     /// Parameter node texts that are not parameters (e.g. C `f(void)`).
     pub ignored_parameters: &'static [&'static str],
 }
@@ -340,8 +346,55 @@ impl<'a> Converter<'a> {
                 .child_by_field_name("body")
                 .map(|b| self.ts_to_ir[&b.id()]),
             range: range(ts),
-            doc: None,
+            doc: self.docstring(ts).or_else(|| self.preceding_comments(ts)),
         }
+    }
+
+    /// A docstring: the body's first statement consisting of a single docstring literal.
+    fn docstring(&self, ts: tree_sitter::Node) -> Option<SourceRange> {
+        let kind = self.mapping.docstring?;
+        let first = ts.child_by_field_name("body")?.named_child(0)?;
+        let is_statement = self
+            .mapping
+            .kinds
+            .contains(&(first.kind(), NodeKind::Statement));
+        let literal = first
+            .named_child(0)
+            .filter(|l| first.named_child_count() == 1 && l.kind() == kind)?;
+        is_statement.then(|| range(literal))
+    }
+
+    /// The block of comment tokens directly above the function (or above its decorators): no blank
+    /// line in between, and not a trailing comment of a preceding line of code.
+    fn preceding_comments(&self, ts: tree_sitter::Node) -> Option<SourceRange> {
+        let first = std::iter::successors(Some(ts), |n| {
+            n.prev_named_sibling()
+                .filter(|p| self.mapping.decorators.contains(&p.kind()))
+        })
+        .last()?;
+        let end = self
+            .tokens
+            .partition_point(|t| t.range.start.offset < first.start_byte());
+        let mut start = end;
+        let mut next_line = first.start_position().row + 1;
+        while start > 0 {
+            let comment = &self.tokens[start - 1];
+            let adjacent = comment.range.last_line() + 1 >= next_line;
+            let trailing = start >= 2 && {
+                let before = &self.tokens[start - 2];
+                before.kind != TokenKind::Comment
+                    && before.range.last_line() == comment.range.first_line()
+            };
+            if comment.kind != TokenKind::Comment || !adjacent || trailing {
+                break;
+            }
+            next_line = comment.range.first_line();
+            start -= 1;
+        }
+        (start < end).then(|| SourceRange {
+            start: self.tokens[start].range.start,
+            end: self.tokens[end - 1].range.end,
+        })
     }
 
     /// Parameters come from a `parameters` list field, or a single `parameter` field

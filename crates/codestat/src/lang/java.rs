@@ -76,5 +76,7 @@ pub static MAPPING: Mapping = Mapping {
     interpolations: &[],
     identifiers: &["identifier", "type_identifier"],
     name_fields: &["name"],
+    decorators: &[],
+    docstring: None,
     ignored_parameters: &[],
 };

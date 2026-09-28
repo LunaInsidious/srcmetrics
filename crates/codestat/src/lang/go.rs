@@ -78,5 +78,7 @@ pub static MAPPING: Mapping = Mapping {
         "label_name",
     ],
     name_fields: &["name"],
+    decorators: &[],
+    docstring: None,
     ignored_parameters: &[],
 };

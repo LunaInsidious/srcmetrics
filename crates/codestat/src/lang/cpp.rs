@@ -83,5 +83,7 @@ pub static MAPPING: Mapping = Mapping {
         "operator_name",
     ],
     name_fields: &["declarator", "name"],
+    decorators: &[],
+    docstring: None,
     ignored_parameters: &["void"],
 };
