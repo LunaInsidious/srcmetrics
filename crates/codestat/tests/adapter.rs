@@ -247,3 +247,32 @@ fn tsx_is_supported() {
     assert_eq!(file.language, "tsx");
     assert_eq!(file.functions.len(), 1);
 }
+
+#[test]
+fn parser_versions_match_cargo_lock() {
+    let lock = std::fs::read_to_string(format!("{}/../../Cargo.lock", env!("CARGO_MANIFEST_DIR")))
+        .unwrap();
+    let locked = |name: &str| {
+        let entry = format!("name = \"{name}\"\nversion = \"");
+        let start = lock
+            .find(&entry)
+            .unwrap_or_else(|| panic!("{name} not in Cargo.lock"))
+            + entry.len();
+        lock[start..].split('"').next().unwrap().to_string()
+    };
+    for adapter in codestat::lang::adapters() {
+        let version = adapter.parser_version();
+        let (runtime, grammar) = version.split_once(" / ").unwrap();
+        assert_eq!(runtime, format!("tree-sitter {}", locked("tree-sitter")));
+        let (name, v) = grammar.split_once(' ').unwrap();
+        assert_eq!(v, locked(name), "{}", adapter.language());
+    }
+}
+
+#[test]
+fn empty_file_has_no_tokens() {
+    for path in ["a.c", "a.py", "a.ts"] {
+        let file = parse_str(path, "");
+        assert!(file.tokens.is_empty(), "{path}: {:?}", file.tokens);
+    }
+}

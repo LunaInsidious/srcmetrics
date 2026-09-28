@@ -7,6 +7,7 @@ pub static MAPPING: Mapping = Mapping {
     language: "python",
     extensions: &["py"],
     grammar: || tree_sitter_python::LANGUAGE.into(),
+    grammar_crate: ("tree-sitter-python", "0.25.0"),
     kinds: &[
         ("block", Block),
         ("expression_statement", Statement),

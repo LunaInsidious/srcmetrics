@@ -13,6 +13,8 @@ pub enum AnalysisError {
         column: usize,
         message: String,
     },
+    /// A file or directory could not be read.
+    Io { path: String, message: String },
     /// The syntax tree could not be converted to the Common IR.
     IrConversion { path: String, message: String },
 }
@@ -34,6 +36,12 @@ impl fmt::Display for AnalysisError {
                 f,
                 "{path}:{line}:{column}: parse error: {message}; fix the syntax or check that the extension matches the language"
             ),
+            AnalysisError::Io { path, message } => {
+                write!(
+                    f,
+                    "{path}: {message}; check that the path exists and is readable"
+                )
+            }
             AnalysisError::IrConversion { path, message } => {
                 write!(
                     f,

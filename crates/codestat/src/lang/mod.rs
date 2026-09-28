@@ -12,12 +12,14 @@ use crate::error::AnalysisError;
 use crate::ir::File;
 use std::path::Path;
 
-pub use treesitter::{Mapping, TreeSitterAdapter};
+pub use treesitter::{Mapping, TREE_SITTER_VERSION, TreeSitterAdapter};
 
 pub trait LanguageAdapter: Sync {
     /// Language id written to the IR and to results (e.g. "c", "python").
     fn language(&self) -> &'static str;
     fn extensions(&self) -> &'static [&'static str];
+    /// Parser name and version, recorded with results for reproducibility (PLAN.md §17).
+    fn parser_version(&self) -> String;
     fn to_ir(&self, path: &str, source: &str) -> Result<File, AnalysisError>;
 }
 

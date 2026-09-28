@@ -24,7 +24,12 @@ pub(crate) fn line_classes(file: &File) -> Result<Vec<LineClass>, String> {
             LineClass::Code
         };
         for line in token.range.first_line()..=token.range.last_line() {
-            let slot = &mut classes[line - 1];
+            let slot = classes.get_mut(line - 1).ok_or_else(|| {
+                format!(
+                    "token {:?} is on line {line}, beyond the end of the source",
+                    token.text
+                )
+            })?;
             if *slot != Some(LineClass::Code) {
                 *slot = Some(class);
             }

@@ -74,6 +74,7 @@ pub static TYPESCRIPT: Mapping = Mapping {
     language: "typescript",
     extensions: &["ts", "mts", "cts"],
     grammar: || tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+    grammar_crate: ("tree-sitter-typescript", "0.23.2"),
     kinds: KINDS,
     logical_operators: &["&&", "||"],
     default_case_keyword: None,

@@ -7,6 +7,7 @@ pub static MAPPING: Mapping = Mapping {
     language: "c",
     extensions: &["c", "h"],
     grammar: || tree_sitter_c::LANGUAGE.into(),
+    grammar_crate: ("tree-sitter-c", "0.24.2"),
     kinds: &[
         ("compound_statement", Block),
         ("expression_statement", Statement),

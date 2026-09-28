@@ -14,6 +14,9 @@ pub struct Mapping {
     pub language: &'static str,
     pub extensions: &'static [&'static str],
     pub grammar: fn() -> tree_sitter::Language,
+    /// Grammar crate name and version, reported as the parser version (PLAN.md §17).
+    /// Checked against Cargo.lock by tests.
+    pub grammar_crate: (&'static str, &'static str),
     /// tree-sitter node type -> IR node kind. Unlisted named nodes become `Other`.
     pub kinds: &'static [(&'static str, NodeKind)],
     /// Operators that turn a `Binary` node into a `Logical` (short-circuit) node.
@@ -32,6 +35,9 @@ pub struct Mapping {
     pub ignored_parameters: &'static [&'static str],
 }
 
+/// tree-sitter runtime version. Checked against Cargo.lock by tests.
+pub const TREE_SITTER_VERSION: &str = "0.27.0";
+
 pub struct TreeSitterAdapter {
     mapping: &'static Mapping,
 }
@@ -49,6 +55,11 @@ impl LanguageAdapter for TreeSitterAdapter {
 
     fn extensions(&self) -> &'static [&'static str] {
         self.mapping.extensions
+    }
+
+    fn parser_version(&self) -> String {
+        let (name, version) = self.mapping.grammar_crate;
+        format!("tree-sitter {TREE_SITTER_VERSION} / {name} {version}")
     }
 
     fn to_ir(&self, path: &str, source: &str) -> Result<File, AnalysisError> {
@@ -130,7 +141,8 @@ impl<'a> Converter<'a> {
                 continue;
             }
             let atomic_literal = self.mapping.literals.contains(&kind);
-            if atomic_literal || ts.child_count() == 0 {
+            // Zero-width leaves (e.g. the root of an empty file) carry no text and are not tokens.
+            if atomic_literal || (ts.child_count() == 0 && ts.start_byte() < ts.end_byte()) {
                 let token_kind = if atomic_literal {
                     TokenKind::Literal
                 } else {
