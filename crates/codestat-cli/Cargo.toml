@@ -1,0 +1,12 @@
+[package]
+name = "codestat-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "codestat"
+path = "src/main.rs"
+
+[dependencies]
+codestat = { path = "../codestat" }
