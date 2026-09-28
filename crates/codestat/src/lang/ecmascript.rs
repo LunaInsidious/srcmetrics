@@ -1,4 +1,5 @@
-//! TypeScript / TSX mapping (tree-sitter-typescript). Both grammars share node types.
+//! JavaScript, TypeScript and TSX mappings. The grammars share their node types; TypeScript
+//! only adds type-level nodes, which are `other` for the metrics.
 
 use super::Mapping;
 use crate::ir::NodeKind::{self, *};
@@ -91,5 +92,13 @@ pub static TSX: Mapping = Mapping {
     language: "tsx",
     extensions: &["tsx"],
     grammar: || tree_sitter_typescript::LANGUAGE_TSX.into(),
+    ..TYPESCRIPT
+};
+
+pub static JAVASCRIPT: Mapping = Mapping {
+    language: "javascript",
+    extensions: &["js", "mjs", "cjs", "jsx"],
+    grammar: || tree_sitter_javascript::LANGUAGE.into(),
+    grammar_crate: ("tree-sitter-javascript", "0.25.0"),
     ..TYPESCRIPT
 };

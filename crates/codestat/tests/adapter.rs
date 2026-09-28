@@ -31,7 +31,7 @@ fn names_and_arity(file: &File) -> Vec<(String, usize)> {
         .collect()
 }
 
-const LANGS: [&str; 3] = ["c", "py", "ts"];
+const LANGS: [&str; 4] = ["c", "py", "ts", "js"];
 
 #[test]
 fn extracts_functions_with_names_and_parameters() {
@@ -371,4 +371,14 @@ fn java_functions_parameters_and_cases() {
     );
     assert_eq!(param_names(&file, 2), vec![Some("y".to_string())]);
     assert_eq!(count(&file, 1, NodeKind::Case), 3);
+}
+
+#[test]
+fn jsx_is_supported() {
+    let file = parse_str(
+        "a.jsx",
+        "const App = (props) => <div>{props.x ? 1 : 2}</div>;\n",
+    );
+    assert_eq!(file.language, "javascript");
+    assert_eq!(kind_count(&file, NodeKind::Conditional), 1);
 }

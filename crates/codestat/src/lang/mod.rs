@@ -4,11 +4,11 @@
 //! per-language modules. The Metric Engine never imports this module.
 
 mod c;
+mod ecmascript;
 mod go;
 mod java;
 mod python;
 mod treesitter;
-mod typescript;
 
 use crate::error::AnalysisError;
 use crate::ir::File;
@@ -28,8 +28,9 @@ pub trait LanguageAdapter: Sync {
 static ADAPTERS: &[TreeSitterAdapter] = &[
     TreeSitterAdapter::new(&c::MAPPING),
     TreeSitterAdapter::new(&python::MAPPING),
-    TreeSitterAdapter::new(&typescript::TYPESCRIPT),
-    TreeSitterAdapter::new(&typescript::TSX),
+    TreeSitterAdapter::new(&ecmascript::TYPESCRIPT),
+    TreeSitterAdapter::new(&ecmascript::TSX),
+    TreeSitterAdapter::new(&ecmascript::JAVASCRIPT),
     TreeSitterAdapter::new(&go::MAPPING),
     TreeSitterAdapter::new(&java::MAPPING),
 ];
