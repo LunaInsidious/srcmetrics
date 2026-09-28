@@ -275,6 +275,21 @@ Acyclic execution paths through a function.
 | Limitations | Not Nejmeh's NPATH: short-circuit operators and early exits (return, jump) do not change the count. |
 | Reference | Nejmeh, B. A. (1988). NPATH: a measure of execution path complexity. CACM 31(2) (related, not identical). |
 
+## `complexity.cognitive` — Cognitive Complexity
+
+How hard a function's control flow is to understand (SonarSource).
+
+| Item | Value |
+|---|---|
+| Definition | Sum of increments for breaks in linear flow, weighted by nesting. |
+| Scope | function, file, project |
+| Input | Node kinds, parent links, call and logical labels |
+| Calculation | if-chain head, loop, catch, ternary, and each run of case labels (a switch): 1 + nesting level. else if / elif and else: 1. Each sequence of like logical operators: 1. A call to the function's own name (recursion): 1. Nesting levels are opened by branches, loops, cases, catches and ternaries. File: sum over functions. Project: sum over files. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Nested functions (lambdas) are measured separately instead of adding to the enclosing function. Labelled break / continue and goto add nothing (jumps have no labels in the IR). |
+| Reference | Campbell, G. A. (2018). Cognitive Complexity: A new way of measuring understandability. SonarSource. |
+
 ## `nesting.max_depth` — Maximum Nesting Depth
 
 Deepest nesting of control structures.

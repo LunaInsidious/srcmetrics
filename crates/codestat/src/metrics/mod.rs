@@ -1,5 +1,6 @@
 //! Metric Engine (PLAN.md §5.4, §8). Calculators read only the Common IR.
 
+mod cognitive;
 mod common;
 mod complexity;
 mod definition;
@@ -146,6 +147,7 @@ pub fn calculators() -> Vec<Box<dyn Calculator>> {
     vec![
         Box::new(size::SizeCalculator),
         Box::new(complexity::ComplexityCalculator),
+        Box::new(cognitive::CognitiveCalculator),
         Box::new(nesting::NestingCalculator),
         Box::new(halstead::HalsteadCalculator),
         Box::new(function::FunctionCalculator),

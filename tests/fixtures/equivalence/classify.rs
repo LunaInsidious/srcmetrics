@@ -15,7 +15,10 @@ fn classify(values: &[i32], n: usize) -> i32 {
     while score > 10 {
         score = score / 2;
     }
-    return if score > 0 { score } else { 0 };
+    if score > 0 {
+        return score;
+    }
+    return 0;
 }
 
 // Returns the larger value.

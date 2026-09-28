@@ -69,7 +69,11 @@ fn real_files_produce_no_errors() {
 #[test]
 fn same_algorithm_same_metrics_across_languages() {
     let result = metrics::compute(&equivalence_program());
-    let ids = ["complexity.cyclomatic", "nesting.max_depth"];
+    let ids = [
+        "complexity.cyclomatic",
+        "nesting.max_depth",
+        "complexity.cognitive",
+    ];
     let per_language: Vec<Vec<Vec<&MetricValue>>> = result
         .files
         .iter()
@@ -89,6 +93,10 @@ fn same_algorithm_same_metrics_across_languages() {
         MetricValue::Available(7.0)
     );
     assert_eq!(classify["nesting.max_depth"], MetricValue::Available(2.0));
+    assert_eq!(
+        classify["complexity.cognitive"],
+        MetricValue::Available(8.0)
+    );
     assert_eq!(
         result.files[0].metrics["size.function_count"],
         MetricValue::Available(2.0)
