@@ -4,6 +4,7 @@
 //! per-language modules. The Metric Engine never imports this module.
 
 mod c;
+mod cpp;
 mod ecmascript;
 mod go;
 mod java;
@@ -35,6 +36,7 @@ static ADAPTERS: &[TreeSitterAdapter] = &[
     TreeSitterAdapter::new(&go::MAPPING),
     TreeSitterAdapter::new(&java::MAPPING),
     TreeSitterAdapter::new(&rust::MAPPING),
+    TreeSitterAdapter::new(&cpp::MAPPING),
 ];
 
 pub fn adapters() -> impl Iterator<Item = &'static dyn LanguageAdapter> {

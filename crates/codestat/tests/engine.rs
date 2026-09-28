@@ -15,7 +15,7 @@ fn parse(name: &str) -> codestat::ir::File {
 }
 
 /// Extensions of the `equivalence/classify.*` fixtures: the same algorithm in every language.
-const EQUIVALENCE_LANGUAGES: [&str; 7] = ["c", "py", "ts", "go", "java", "js", "rs"];
+const EQUIVALENCE_LANGUAGES: [&str; 8] = ["c", "py", "ts", "go", "java", "js", "rs", "cpp"];
 
 fn equivalence_program() -> Program {
     Program {

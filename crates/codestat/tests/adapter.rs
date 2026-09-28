@@ -399,3 +399,23 @@ fn rust_functions_closures_and_match_arms() {
     assert_eq!(param_names(&file, 1), vec![Some("y".to_string())]);
     assert_eq!(count(&file, 0, NodeKind::Case), 2);
 }
+
+#[test]
+fn cpp_methods_qualified_names_lambdas_and_catch() {
+    let file = parse_str(
+        "a.cpp",
+        "class A {\n public:\n  int m(int x) const { return x; }\n  ~A() {}\n};\nint A::q(std::vector<int>& v, int k) {\n  for (auto& e : v) { k += e; }\n  auto f = [&](int y) { return y + k; };\n  try { f(1); } catch (const std::exception& e) { throw; }\n  return k;\n}\n",
+    );
+    let names: Vec<_> = file.functions.iter().map(|f| f.name.clone()).collect();
+    assert_eq!(
+        names,
+        vec![Some("m".into()), Some("~A".into()), Some("q".into()), None]
+    );
+    assert_eq!(
+        param_names(&file, 2),
+        ["v", "k"].map(|s| Some(s.to_string()))
+    );
+    assert_eq!(param_names(&file, 3), vec![Some("y".to_string())]);
+    assert_eq!(count(&file, 2, NodeKind::Loop), 1);
+    assert_eq!(count(&file, 2, NodeKind::Catch), 1);
+}
