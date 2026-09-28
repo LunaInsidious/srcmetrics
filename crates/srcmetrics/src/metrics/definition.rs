@@ -64,8 +64,8 @@ impl Applicability {
 pub fn to_markdown(definitions: &[&MetricDefinition]) -> String {
     let mut out = format!(
         "# メトリクス定義書\n\n\
-         このファイルは `crates/codestat/src/metrics` の定義から生成される。直接編集しないこと。\n\
-         再生成: `UPDATE_DOCS=1 cargo test -p codestat --test docs`\n\n\
+         このファイルは `crates/srcmetrics/src/metrics` の定義から生成される。直接編集しないこと。\n\
+         再生成: `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`\n\n\
          Metric Definition Version: `{DEFINITION_VERSION}`\n\n"
     );
     for d in definitions {

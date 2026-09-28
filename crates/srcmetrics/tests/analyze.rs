@@ -1,8 +1,8 @@
 //! End-to-end analysis: directory -> result with run metadata (PLAN.md §11, §17, ADR-0010).
 
-use codestat::analyze::analyze;
-use codestat::error::AnalysisError;
-use codestat::result::FileResult;
+use srcmetrics::analyze::analyze;
+use srcmetrics::error::AnalysisError;
+use srcmetrics::result::FileResult;
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -41,7 +41,7 @@ fn records_run_metadata() {
     assert_eq!(run.project, "demo");
     assert_eq!(
         run.metric_definition_version,
-        codestat::metrics::DEFINITION_VERSION
+        srcmetrics::metrics::DEFINITION_VERSION
     );
     assert_eq!(run.tool_version, env!("CARGO_PKG_VERSION"));
     assert!(
@@ -126,7 +126,7 @@ fn single_file_can_be_analyzed() {
 fn result_round_trips_through_json() {
     let result = analyze(&fixture("mixed"), None).unwrap();
     let json = serde_json::to_string(&result).unwrap();
-    let back: codestat::result::AnalysisResult = serde_json::from_str(&json).unwrap();
+    let back: srcmetrics::result::AnalysisResult = serde_json::from_str(&json).unwrap();
     assert_eq!(back, result);
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(value["files"][0]["status"], "error");
@@ -136,7 +136,7 @@ fn result_round_trips_through_json() {
 #[test]
 fn source_text_can_be_analyzed_without_the_file_system() {
     let result =
-        codestat::analyze::analyze_source("snippet.py", "def f(a):\n    return a\n").unwrap();
+        srcmetrics::analyze::analyze_source("snippet.py", "def f(a):\n    return a\n").unwrap();
     assert_eq!(paths(&result.files), vec!["snippet.py"]);
     assert_eq!(result.run.project, "snippet");
     assert_eq!(
@@ -147,6 +147,6 @@ fn source_text_can_be_analyzed_without_the_file_system() {
         (None, None)
     );
     assert_eq!(result.project.metrics["size.function_count"], Some(1.0));
-    let err = codestat::analyze::analyze_source("broken.py", "def (:\n").unwrap_err();
+    let err = srcmetrics::analyze::analyze_source("broken.py", "def (:\n").unwrap_err();
     assert!(matches!(err, AnalysisError::Parse { .. }), "{err:?}");
 }

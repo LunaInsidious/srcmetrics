@@ -1,8 +1,8 @@
 //! Language Adapter tests: source code -> Common IR, per language.
 
-use codestat::error::AnalysisError;
-use codestat::ir::{File, NodeKind, TokenKind};
-use codestat::lang::adapter_for_path;
+use srcmetrics::error::AnalysisError;
+use srcmetrics::ir::{File, NodeKind, TokenKind};
+use srcmetrics::lang::adapter_for_path;
 
 fn fixture(name: &str) -> (String, String) {
     let path = format!("{}/../../tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -260,7 +260,7 @@ fn parser_versions_match_cargo_lock() {
             + entry.len();
         lock[start..].split('"').next().unwrap().to_string()
     };
-    for adapter in codestat::lang::adapters() {
+    for adapter in srcmetrics::lang::adapters() {
         let version = adapter.parser_version();
         let (runtime, grammar) = version.split_once(" / ").unwrap();
         assert_eq!(runtime, format!("tree-sitter {}", locked("tree-sitter")));

@@ -1,8 +1,16 @@
 [package]
-name = "codestat"
+name = "srcmetrics"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories = ["development-tools"]
+description = "Language-independent source code metrics (size, complexity, nesting, Halstead, duplication, dependencies, documentation) for C, C++, Go, Java, JavaScript, Python, Rust and TypeScript"
+readme = "../../README.md"
+# Integration tests use fixtures from the repository root, which are not packaged.
+exclude = ["tests"]
 
 [dependencies]
 tree-sitter = "0.27"

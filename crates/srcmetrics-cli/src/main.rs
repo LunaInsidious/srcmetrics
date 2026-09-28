@@ -1,12 +1,12 @@
-//! codestat command-line interface.
+//! srcmetrics command-line interface.
 
 mod serve;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use codestat::analyze::analyze;
-use codestat::result::{AnalysisResult, FileResult};
-use codestat::stats::{self, UnitScope};
-use codestat::{metrics, model};
+use srcmetrics::analyze::analyze;
+use srcmetrics::result::{AnalysisResult, FileResult};
+use srcmetrics::stats::{self, UnitScope};
+use srcmetrics::{metrics, model};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -38,7 +38,7 @@ enum Command {
     },
     /// Descriptive statistics, per-language baselines and correlations of analysis results (JSON).
     Stats {
-        /// Result files written by `codestat analyze` (JSON).
+        /// Result files written by `srcmetrics analyze` (JSON).
         #[arg(required = true)]
         results: Vec<PathBuf>,
         /// Unit of analysis.
@@ -47,7 +47,7 @@ enum Command {
     },
     /// Write a self-contained HTML report (tables, histograms, correlation heatmap) of a result.
     Report {
-        /// Result file written by `codestat analyze` (JSON).
+        /// Result file written by `srcmetrics analyze` (JSON).
         result: PathBuf,
         /// Write the report to this file instead of stdout.
         #[arg(long, short)]
@@ -90,7 +90,7 @@ enum ModelCommand {
         /// Write the model to this file instead of stdout.
         #[arg(long, short)]
         output: Option<PathBuf>,
-        /// Result files written by `codestat analyze` (JSON).
+        /// Result files written by `srcmetrics analyze` (JSON).
         #[arg(required = true)]
         results: Vec<PathBuf>,
     },
@@ -152,7 +152,7 @@ fn run(command: Command) -> Result<(), String> {
             warn_failed_files(&result);
             let text = match format {
                 ResultFormat::Json => to_json(&result)?,
-                ResultFormat::Csv => codestat::csv::to_csv(&result),
+                ResultFormat::Csv => srcmetrics::csv::to_csv(&result),
             };
             write(output, &text)
         }
@@ -166,7 +166,7 @@ fn run(command: Command) -> Result<(), String> {
         Command::Model { command } => run_model(command),
         Command::Report { result, output } => {
             let result = load_results(std::slice::from_ref(&result))?.remove(0);
-            write(output, &codestat::report::to_html(&result))
+            write(output, &srcmetrics::report::to_html(&result))
         }
         Command::Serve { bind, port } => serve::serve(std::net::SocketAddr::new(bind, port)),
         Command::Metrics { format } => {
@@ -221,7 +221,7 @@ fn load_results(paths: &[PathBuf]) -> Result<Vec<AnalysisResult>, String> {
         .map(|p| {
             let text = read(p)?;
             serde_json::from_str(&text).map_err(|e| {
-                format!("{}: not an analysis result ({e}); create one with `codestat analyze <PATH> -o result.json`", p.display())
+                format!("{}: not an analysis result ({e}); create one with `srcmetrics analyze <PATH> -o result.json`", p.display())
             })
         })
         .collect()

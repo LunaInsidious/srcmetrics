@@ -1254,3 +1254,42 @@ PLAN §20 Phase 4 の「API / UI」。範囲が広がりやすいので最小限
 | Date | Status | Change |
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0022: 公開名を srcmetrics とし、MIT OR Apache-2.0 で公開する
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** release, naming, license
+
+## Context
+
+### Problem
+
+ライブラリとして crates.io に公開する。開発名 `codestat` は crates.io で既に使われている（codestat 0.2.1）。ライセンスは未決定だった（Cargo.toml の MIT は仮置き）。
+
+## Decision
+
+- crate 名：ライブラリ `srcmetrics`、CLI `srcmetrics-cli`（実行ファイル名 `srcmetrics`）
+- ディレクトリも `crates/srcmetrics`, `crates/srcmetrics-cli` に改名し、利用者に見える文字列（コマンド例、レポート・UI の表題、エラーメッセージ）も `srcmetrics` にする
+- ライセンス：`MIT OR Apache-2.0`（LICENSE-MIT, LICENSE-APACHE）
+- README.md は crates.io の利用者向けに英語で書く。設計文書（PLAN.md, docs/）は日本語のまま
+- ADR・MEMO の過去の記述に出てくる `codestat` は、当時の記録として書き換えない
+
+### Rationale
+
+- `srcmetrics` は短く、用途（ソースコードのメトリクス）が名前から分かり、crates.io で未使用だった
+- MIT OR Apache-2.0 は Rust エコシステムの慣例で、利用者がどちらかを選べる
+
+## Alternatives Considered
+
+### readability-metrics
+**Rejected because:** 長い。本システムは単一の可読性スコアを出さない（§10）ので、名前が誤解を招きうる
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |

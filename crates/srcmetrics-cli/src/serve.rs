@@ -1,13 +1,13 @@
-//! `codestat serve`: minimal local HTTP API and UI (ADR-0021).
+//! `srcmetrics serve`: minimal local HTTP API and UI (ADR-0021).
 
 use axum::Router;
 use axum::extract::Json;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
-use codestat::analyze::analyze_source;
-use codestat::metrics;
 use serde::Deserialize;
+use srcmetrics::analyze::analyze_source;
+use srcmetrics::metrics;
 use std::net::SocketAddr;
 
 const UI: &str = include_str!("ui.html");

@@ -1,8 +1,8 @@
 //! Training and prediction on analysis results (ADR-0019).
 
-use codestat::analyze::analyze;
-use codestat::model::{Label, predict_all, train};
-use codestat::result::AnalysisResult;
+use srcmetrics::analyze::analyze;
+use srcmetrics::model::{Label, predict_all, train};
+use srcmetrics::result::AnalysisResult;
 use std::path::PathBuf;
 
 fn result(name: &str) -> AnalysisResult {

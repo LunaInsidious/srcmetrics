@@ -20,7 +20,7 @@ pub fn to_html(result: &AnalysisResult) -> String {
     let mut html = format!(
         "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-         <title>codestat report</title><style>{STYLE}</style></head><body>\n<h1>codestat report: {}</h1>\n",
+         <title>srcmetrics report</title><style>{STYLE}</style></head><body>\n<h1>srcmetrics report: {}</h1>\n",
         escape(&result.run.project)
     );
     html += &run_table(result);
@@ -264,7 +264,7 @@ mod tests {
     fn contains_metadata_tables_histograms_and_heatmap() {
         let html = report("demo");
         assert!(html.starts_with("<!DOCTYPE html>"));
-        assert!(html.contains("<h1>codestat report: demo</h1>"));
+        assert!(html.contains("<h1>srcmetrics report: demo</h1>"));
         assert!(html.contains("metric_definition_version"));
         assert!(html.contains("<td>complexity.cyclomatic</td>"));
         assert!(html.contains("class=\"histogram\""));

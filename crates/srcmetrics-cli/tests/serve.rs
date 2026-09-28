@@ -1,4 +1,4 @@
-//! HTTP API / UI end-to-end tests (ADR-0021). Starts `codestat serve` on a free port.
+//! HTTP API / UI end-to-end tests (ADR-0021). Starts `srcmetrics serve` on a free port.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
@@ -11,7 +11,7 @@ struct Server {
 
 impl Server {
     fn start() -> Server {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_codestat"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_srcmetrics"))
             .args(["serve", "--port", "0"])
             .stderr(Stdio::piped())
             .spawn()

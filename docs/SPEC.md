@@ -1,4 +1,4 @@
-# codestat 技術仕様書
+# srcmetrics 技術仕様書
 
 要求仕様は [PLAN.md](../PLAN.md)、設計判断の根拠は [ADR.md](ADR.md)、各メトリクスの定義は [METRICS.md](METRICS.md)（コードから生成）を参照。
 本書は「現在の実装が何をどう行うか」を記述する。
@@ -6,7 +6,7 @@
 ## 1. 構成
 
 ```text
-crates/codestat/          コアライブラリ（同期・ネットワーク非依存）
+crates/srcmetrics/          コアライブラリ（同期・ネットワーク非依存）
   src/ir.rs               Common IR
   src/error.rs            解析エラー
   src/lang/               Language Adapter（tree-sitter 汎用変換器 + 言語別 Mapping）
@@ -17,7 +17,7 @@ crates/codestat/          コアライブラリ（同期・ネットワーク非
   src/stats.rs            記述統計・言語別ベースライン・相関（Phase 4）
   src/model.rs            実験的な可読性モデル（利用者のラベルから学習するリッジ回帰。Phase 4）
   src/report.rs           自己完結 HTML レポート（Phase 4）
-crates/codestat-cli/      CLI（clap）と HTTP サーバ（axum。src/serve.rs, src/ui.html）
+crates/srcmetrics-cli/      CLI（clap）と HTTP サーバ（axum。src/serve.rs, src/ui.html）
 tests/fixtures/           言語別フィクスチャ
 ```
 
@@ -86,7 +86,7 @@ analyze(path)
 
 ### 言語の追加手順
 
-1. grammar クレートを `crates/codestat/Cargo.toml` に追加（ADR に記録）
+1. grammar クレートを `crates/srcmetrics/Cargo.toml` に追加（ADR に記録）
 2. `src/lang/<lang>.rs` に `Mapping` を書き、`src/lang/mod.rs` の `ADAPTERS` に登録
 3. `tests/fixtures/equivalence/classify.<ext>` を追加し、`tests/engine.rs` の `EQUIVALENCE_LANGUAGES` に加える（Cyclomatic / Cognitive / Max Nesting が全言語で一致すること）
 
@@ -134,7 +134,7 @@ Metric Engine は変更しない。
 
 1. `src/metrics/<name>.rs` に Calculator と `DEFINITIONS` を書き、`calculators()` に登録
 2. 手組み IR（`ir::builder`）で単体テストを書く
-3. `UPDATE_DOCS=1 cargo test -p codestat --test docs` で METRICS.md を再生成
+3. `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs` で METRICS.md を再生成
 
 ## 6. 解析結果（ADR-0010）
 
@@ -148,13 +148,13 @@ Metric Engine は変更しない。
 ## 7. CLI
 
 ```text
-codestat analyze <PATH> [--project NAME] [-o FILE] [--format json|csv]   解析結果を出力（CSV は ADR-0016）
-codestat metrics [--format json|markdown]                              メトリクス定義を出力（markdown は docs/METRICS.md と同一）
-codestat stats <RESULT.json>... [--scope file|function]               記述統計・言語別ベースライン・相関（ADR-0018）
-codestat report <RESULT.json> [-o FILE]                               自己完結 HTML レポート（ADR-0020）
-codestat model train --labels LABELS.csv [--features ids] [--lambda L] [-o MODEL.json] <RESULT.json>...
-codestat model predict --model MODEL.json <RESULT.json>...             実験的モデル（ADR-0019。既定の重みはない）
-codestat serve [--bind 127.0.0.1] [--port 8080]                       HTTP API と Web UI（ADR-0021）
+srcmetrics analyze <PATH> [--project NAME] [-o FILE] [--format json|csv]   解析結果を出力（CSV は ADR-0016）
+srcmetrics metrics [--format json|markdown]                              メトリクス定義を出力（markdown は docs/METRICS.md と同一）
+srcmetrics stats <RESULT.json>... [--scope file|function]               記述統計・言語別ベースライン・相関（ADR-0018）
+srcmetrics report <RESULT.json> [-o FILE]                               自己完結 HTML レポート（ADR-0020）
+srcmetrics model train --labels LABELS.csv [--features ids] [--lambda L] [-o MODEL.json] <RESULT.json>...
+srcmetrics model predict --model MODEL.json <RESULT.json>...             実験的モデル（ADR-0019。既定の重みはない）
+srcmetrics serve [--bind 127.0.0.1] [--port 8080]                       HTTP API と Web UI（ADR-0021）
 ```
 
 - 解析できなかったファイルがあれば、結果に含めたうえで stderr に件数と理由を出す（終了コードは 0）
@@ -163,15 +163,15 @@ codestat serve [--bind 127.0.0.1] [--port 8080]                       HTTP API �
 ### 典型的な使い方
 
 ```sh
-codestat analyze src -o result.json
-codestat stats result.json --scope function > stats.json
-codestat report result.json -o report.html
+srcmetrics analyze src -o result.json
+srcmetrics stats result.json --scope function > stats.json
+srcmetrics report result.json -o report.html
 # 人間の評価 labels.csv（path,function,score）があれば
-codestat model train --labels labels.csv -o model.json result.json
-codestat model predict --model model.json result.json
+srcmetrics model train --labels labels.csv -o model.json result.json
+srcmetrics model predict --model model.json result.json
 ```
 
-### HTTP API（`codestat serve`）
+### HTTP API（`srcmetrics serve`）
 
 | メソッド・パス | 内容 |
 |---|---|
@@ -207,5 +207,5 @@ codestat model predict --model model.json result.json
 | `tests/docs.rs` | METRICS.md の同期 |
 | `tests/analyze.rs` | ディレクトリ解析、エラーファイルの記録、run メタデータ、JSON 往復 |
 | `tests/model.rs` | ラベルの照合、学習、予測 |
-| `crates/codestat-cli/tests/cli.rs` | CLI の出力と終了コード |
-| `crates/codestat-cli/tests/serve.rs` | HTTP API / UI（実際にサーバを起動） |
+| `crates/srcmetrics-cli/tests/cli.rs` | CLI の出力と終了コード |
+| `crates/srcmetrics-cli/tests/serve.rs` | HTTP API / UI（実際にサーバを起動） |

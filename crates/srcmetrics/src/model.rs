@@ -69,7 +69,7 @@ pub fn read_labels(csv_text: &str) -> Result<Vec<Label>, ModelError> {
 }
 
 pub const EXPERIMENTAL_NOTICE: &str = "Experimental: fitted only on the labels provided by the user. \
-                                       codestat has no built-in readability weights (PLAN.md §10).";
+                                       srcmetrics has no built-in readability weights (PLAN.md §10).";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Model {
@@ -340,11 +340,11 @@ fn unusable(rows: &[Row], name: &str) -> Option<String> {
 }
 
 impl Model {
-    /// Loads a model written by `codestat model train`, checking that its vectors are consistent.
+    /// Loads a model written by `srcmetrics model train`, checking that its vectors are consistent.
     pub fn from_json(text: &str) -> Result<Model, ModelError> {
         let model: Model = serde_json::from_str(text).map_err(|e| {
             ModelError(format!(
-                "not a model ({e}); create one with `codestat model train`"
+                "not a model ({e}); create one with `srcmetrics model train`"
             ))
         })?;
         let lengths = [
@@ -356,7 +356,7 @@ impl Model {
         if lengths.iter().any(|l| *l != lengths[0]) {
             return Err(ModelError(format!(
                 "not a model: features, means, sds and coefficients lengths differ ({lengths:?}); \
-                 create one with `codestat model train`"
+                 create one with `srcmetrics model train`"
             )));
         }
         Ok(model)

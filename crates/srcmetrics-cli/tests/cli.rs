@@ -6,8 +6,8 @@ fn fixture(name: &str) -> String {
     format!("{}/../../tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
-fn codestat(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_codestat"))
+fn srcmetrics(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_srcmetrics"))
         .args(args)
         .output()
         .unwrap()
@@ -24,7 +24,7 @@ fn json(output: &Output) -> serde_json::Value {
 
 #[test]
 fn analyze_prints_json_result() {
-    let value = json(&codestat(&["analyze", &fixture("equivalence")]));
+    let value = json(&srcmetrics(&["analyze", &fixture("equivalence")]));
     let files = value["files"].as_array().unwrap().len();
     assert!(files > 0);
     assert_eq!(value["run"]["project"], "equivalence");
@@ -39,7 +39,7 @@ fn analyze_accepts_project_name_and_output_file() {
     let dir = format!("{}/../../target/cli-test", env!("CARGO_MANIFEST_DIR"));
     std::fs::create_dir_all(&dir).unwrap();
     let out = format!("{dir}/result.json");
-    let output = codestat(&[
+    let output = srcmetrics(&[
         "analyze",
         &fixture("equivalence"),
         "--project",
@@ -55,7 +55,7 @@ fn analyze_accepts_project_name_and_output_file() {
 
 #[test]
 fn analyze_warns_about_files_that_failed() {
-    let output = codestat(&["analyze", &fixture("mixed")]);
+    let output = srcmetrics(&["analyze", &fixture("mixed")]);
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -67,7 +67,7 @@ fn analyze_warns_about_files_that_failed() {
 
 #[test]
 fn analyze_fails_with_a_message_for_a_missing_path() {
-    let output = codestat(&["analyze", &fixture("does-not-exist")]);
+    let output = srcmetrics(&["analyze", &fixture("does-not-exist")]);
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("check that the path exists"), "{stderr}");
@@ -75,7 +75,7 @@ fn analyze_fails_with_a_message_for_a_missing_path() {
 
 #[test]
 fn metrics_lists_definitions_as_json() {
-    let value = json(&codestat(&["metrics"]));
+    let value = json(&srcmetrics(&["metrics"]));
     let ids: Vec<_> = value
         .as_array()
         .unwrap()
@@ -98,7 +98,7 @@ fn metrics_lists_definitions_as_json() {
 
 #[test]
 fn metrics_markdown_matches_the_definition_document() {
-    let output = codestat(&["metrics", "--format", "markdown"]);
+    let output = srcmetrics(&["metrics", "--format", "markdown"]);
     let doc = std::fs::read_to_string(format!(
         "{}/../../docs/METRICS.md",
         env!("CARGO_MANIFEST_DIR")
@@ -109,7 +109,7 @@ fn metrics_markdown_matches_the_definition_document() {
 
 #[test]
 fn analyze_can_print_csv() {
-    let output = codestat(&["analyze", &fixture("mixed"), "--format", "csv"]);
+    let output = srcmetrics(&["analyze", &fixture("mixed"), "--format", "csv"]);
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).unwrap();
     assert!(text.starts_with("scope,path,language,function,start_line,end_line,status,error,"));
@@ -126,7 +126,7 @@ fn analyzed(fixture_name: &str) -> String {
     std::fs::create_dir_all(&dir).unwrap();
     let out = format!("{dir}/{}.json", fixture_name.replace('/', "_"));
     assert!(
-        codestat(&["analyze", &fixture(fixture_name), "-o", &out])
+        srcmetrics(&["analyze", &fixture(fixture_name), "-o", &out])
             .status
             .success()
     );
@@ -136,7 +136,7 @@ fn analyzed(fixture_name: &str) -> String {
 #[test]
 fn stats_summarizes_functions_by_language() {
     let result = analyzed("equivalence");
-    let value = json(&codestat(&["stats", &result, "--scope", "function"]));
+    let value = json(&srcmetrics(&["stats", &result, "--scope", "function"]));
     let languages = value["by_language"].as_object().unwrap().len();
     assert_eq!(value["units"], 2 * languages);
     // The same algorithm in every language: cyclomatic complexity has no spread across languages.
@@ -146,16 +146,16 @@ fn stats_summarizes_functions_by_language() {
 
 #[test]
 fn stats_rejects_a_file_that_is_not_a_result() {
-    let output = codestat(&["stats", &fixture("mixed/ok.py")]);
+    let output = srcmetrics(&["stats", &fixture("mixed/ok.py")]);
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("codestat analyze"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("srcmetrics analyze"));
 }
 
 #[test]
 fn model_train_then_predict() {
     let result = analyzed("equivalence");
     let dir = format!("{}/../../target/cli-test", env!("CARGO_MANIFEST_DIR"));
-    let parsed = json(&codestat(&["stats", &result]));
+    let parsed = json(&srcmetrics(&["stats", &result]));
     assert!(parsed["units"].as_u64().unwrap() >= 5);
     let files: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&result).unwrap()).unwrap();
@@ -166,7 +166,7 @@ fn model_train_then_predict() {
     let labels_path = format!("{dir}/labels.csv");
     std::fs::write(&labels_path, labels).unwrap();
     let model_path = format!("{dir}/model.json");
-    let output = codestat(&[
+    let output = srcmetrics(&[
         "model",
         "train",
         "--labels",
@@ -188,7 +188,7 @@ fn model_train_then_predict() {
             .unwrap()
             .starts_with("Experimental")
     );
-    let predictions = json(&codestat(&[
+    let predictions = json(&srcmetrics(&[
         "model",
         "predict",
         "--model",
@@ -208,7 +208,7 @@ fn report_writes_a_self_contained_html_file() {
         "{}/../../target/cli-test/report.html",
         env!("CARGO_MANIFEST_DIR")
     );
-    let output = codestat(&["report", &result, "-o", &out]);
+    let output = srcmetrics(&["report", &result, "-o", &out]);
     assert!(
         output.status.success(),
         "{}",

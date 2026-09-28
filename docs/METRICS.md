@@ -1,7 +1,7 @@
 # メトリクス定義書
 
-このファイルは `crates/codestat/src/metrics` の定義から生成される。直接編集しないこと。
-再生成: `UPDATE_DOCS=1 cargo test -p codestat --test docs`
+このファイルは `crates/srcmetrics/src/metrics` の定義から生成される。直接編集しないこと。
+再生成: `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`
 
 Metric Definition Version: `0.1.0`
 

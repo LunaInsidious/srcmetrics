@@ -1,6 +1,6 @@
 //! docs/METRICS.md must match the metric definitions in code (AGENTS.md: docs are part of the task).
 
-use codestat::metrics;
+use srcmetrics::metrics;
 
 #[test]
 fn metrics_doc_is_up_to_date() {
@@ -12,6 +12,6 @@ fn metrics_doc_is_up_to_date() {
     let current = std::fs::read_to_string(&path).unwrap_or_default();
     assert!(
         current == generated,
-        "docs/METRICS.md is out of date; run `UPDATE_DOCS=1 cargo test -p codestat --test docs`"
+        "docs/METRICS.md is out of date; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`"
     );
 }

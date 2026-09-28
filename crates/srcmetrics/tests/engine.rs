@@ -1,11 +1,11 @@
 //! Metric Engine invariants and cross-language equivalence (PLAN.md §6, §9, §19).
 
-use codestat::ir::Program;
-use codestat::lang::adapter_for_path;
-use codestat::metrics::{self, MetricValue, Metrics, Scope};
+use srcmetrics::ir::Program;
+use srcmetrics::lang::adapter_for_path;
+use srcmetrics::metrics::{self, MetricValue, Metrics, Scope};
 use std::collections::HashSet;
 
-fn parse(name: &str) -> codestat::ir::File {
+fn parse(name: &str) -> srcmetrics::ir::File {
     let path = format!("{}/../../tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
     let source = std::fs::read_to_string(&path).unwrap();
     adapter_for_path(&path)
