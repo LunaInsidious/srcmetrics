@@ -23,6 +23,9 @@ pub struct Mapping {
     pub logical_operators: &'static [&'static str],
     /// Keyword that marks a `Case` node as the default label (not a decision point).
     pub default_case_keyword: Option<&'static str>,
+    /// For grammars without an else-clause node (Go, Java): the field of a `Branch` node holding
+    /// its else part. A child in this field that is not itself a `Branch` becomes an `Else`.
+    pub else_field: Option<&'static str>,
     /// Node types that become a single comment token.
     pub comments: &'static [&'static str],
     /// Node types that become literal tokens; their subtree is not walked, except for interpolations.
@@ -136,8 +139,9 @@ impl<'a> Converter<'a> {
     /// tokens for its text, and only its interpolated code (e.g. `${...}`) is walked further.
     fn convert(mut self, path: &str, root: tree_sitter::Node<'a>) -> Result<File, AnalysisError> {
         let mut function_nodes = vec![];
-        let mut stack: Vec<(tree_sitter::Node, Option<NodeId>)> = vec![(root, None)];
-        while let Some((ts, parent)) = stack.pop() {
+        let mut stack: Vec<(tree_sitter::Node, Option<NodeId>, Option<&str>)> =
+            vec![(root, None, None)];
+        while let Some((ts, parent, field)) = stack.pop() {
             let kind = ts.kind();
             if self.mapping.comments.contains(&kind) {
                 self.push_token(TokenKind::Comment, ts.byte_range(), range(ts));
@@ -150,7 +154,7 @@ impl<'a> Converter<'a> {
                 self.push_leaf(ts)
             };
             let ir_parent = if ts.is_named() {
-                let id = self.push_node(ts, parent);
+                let id = self.push_node(ts, parent, field);
                 if self.nodes[id.0].kind == NodeKind::Function {
                     function_nodes.push((ts, id));
                 }
@@ -158,7 +162,7 @@ impl<'a> Converter<'a> {
             } else {
                 parent
             };
-            stack.extend(children.into_iter().rev().map(|c| (c, ir_parent)));
+            stack.extend(children.into_iter().rev().map(|(c, f)| (c, ir_parent, f)));
         }
         // Interpolated code is tokenized after its enclosing literal's text; restore source order.
         self.tokens.sort_by_key(|t| t.range.start.offset);
@@ -178,11 +182,25 @@ impl<'a> Converter<'a> {
         })
     }
 
-    fn push_node(&mut self, ts: tree_sitter::Node, parent: Option<NodeId>) -> NodeId {
+    fn push_node(
+        &mut self,
+        ts: tree_sitter::Node,
+        parent: Option<NodeId>,
+        field: Option<&str>,
+    ) -> NodeId {
         let id = NodeId(self.nodes.len());
+        let mut kind = self.node_kind(ts);
+        let parent_is_branch = parent.is_some_and(|p| self.nodes[p.0].kind == NodeKind::Branch);
+        if parent_is_branch
+            && kind != NodeKind::Branch
+            && field.is_some()
+            && field == self.mapping.else_field
+        {
+            kind = NodeKind::Else;
+        }
         self.nodes.push(Node {
             id,
-            kind: self.node_kind(ts),
+            kind,
             parent,
             children: vec![],
             range: range(ts),
@@ -231,17 +249,16 @@ impl<'a> Converter<'a> {
 
     /// Tokenizes a leaf (zero-width leaves such as an empty file's root carry no text and are
     /// skipped) and returns the children to walk.
-    fn push_leaf(&mut self, ts: tree_sitter::Node<'a>) -> Vec<tree_sitter::Node<'a>> {
+    fn push_leaf(&mut self, ts: tree_sitter::Node<'a>) -> Vec<Child<'a>> {
         if ts.child_count() == 0 && ts.start_byte() < ts.end_byte() {
             self.push_token(self.classify_leaf(ts), ts.byte_range(), range(ts));
         }
-        let mut cursor = ts.walk();
-        ts.children(&mut cursor).collect()
+        children_with_fields(ts)
     }
 
     /// Emits one literal token per stretch of text between interpolations, and returns the
     /// interpolation children, which are walked as ordinary code.
-    fn push_literal(&mut self, ts: tree_sitter::Node<'a>) -> Vec<tree_sitter::Node<'a>> {
+    fn push_literal(&mut self, ts: tree_sitter::Node<'a>) -> Vec<Child<'a>> {
         let mut cursor = ts.walk();
         let interpolations: Vec<_> = ts
             .named_children(&mut cursor)
@@ -265,7 +282,7 @@ impl<'a> Converter<'a> {
         for r in text.into_iter().filter(|r| r.start.offset < r.end.offset) {
             self.push_token(TokenKind::Literal, r.start.offset..r.end.offset, r);
         }
-        interpolations
+        interpolations.into_iter().map(|c| (c, None)).collect()
     }
 
     /// Generic token classification rule (ADR-0004).
@@ -310,11 +327,28 @@ impl<'a> Converter<'a> {
         nodes
             .into_iter()
             .filter(|p| !self.mapping.ignored_parameters.contains(&self.text(*p)))
-            .map(|p| Parameter {
+            .flat_map(|p| self.declared_parameters(p))
+            .collect()
+    }
+
+    /// One parameter per name when a declaration names several (Go `a, b int`), else one.
+    fn declared_parameters(&self, p: tree_sitter::Node) -> Vec<Parameter> {
+        let mut cursor = p.walk();
+        let names: Vec<_> = p.children_by_field_name("name", &mut cursor).collect();
+        if names.len() > 1 {
+            names
+                .into_iter()
+                .map(|n| Parameter {
+                    name: Some(self.text(n).to_string()),
+                    range: range(n),
+                })
+                .collect()
+        } else {
+            vec![Parameter {
                 name: self.name_of(p),
                 range: range(p),
-            })
-            .collect()
+            }]
+        }
     }
 
     /// Looks up `field` on `ts`, then along its name-field chain (e.g. C's declarator nesting).
@@ -351,6 +385,23 @@ impl<'a> Converter<'a> {
     fn text(&self, ts: tree_sitter::Node) -> &'a str {
         &self.source[ts.byte_range()]
     }
+}
+
+/// A child node and the field it is in.
+type Child<'a> = (tree_sitter::Node<'a>, Option<&'a str>);
+
+fn children_with_fields(ts: tree_sitter::Node<'_>) -> Vec<Child<'_>> {
+    let mut cursor = ts.walk();
+    let mut children = vec![];
+    if cursor.goto_first_child() {
+        loop {
+            children.push((cursor.node(), cursor.field_name()));
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+    children
 }
 
 fn position(p: Point, offset: usize) -> Position {

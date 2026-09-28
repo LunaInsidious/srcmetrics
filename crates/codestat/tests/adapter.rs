@@ -316,3 +316,38 @@ fn tokens_are_in_source_order() {
     sorted.sort();
     assert_eq!(offsets, sorted);
 }
+
+#[test]
+fn go_functions_and_parameters() {
+    let file = parse("equivalence/classify.go");
+    assert_eq!(
+        names_and_arity(&file),
+        vec![("classify".to_string(), 2), ("max2".to_string(), 2)]
+    );
+    let file = parse_str("a.go", "package p\nfunc f(a, b int, c ...string) {}\n");
+    assert_eq!(
+        param_names(&file, 0),
+        ["a", "b", "c"].map(|s| Some(s.to_string()))
+    );
+}
+
+#[test]
+fn else_without_an_else_clause_node_is_an_else() {
+    // Go has no else_clause node: the else block is the if statement's `alternative`.
+    let file = parse_str(
+        "a.go",
+        "package p\nfunc f(x int) {\n\tif x > 0 {\n\t} else if x < 0 {\n\t} else {\n\t}\n}\n",
+    );
+    assert_eq!(count(&file, 0, NodeKind::Branch), 2);
+    assert_eq!(count(&file, 0, NodeKind::Else), 1);
+}
+
+#[test]
+fn go_switch_default_is_not_a_case_and_closures_are_functions() {
+    let file = parse_str(
+        "a.go",
+        "package p\nfunc f(a int) {\n\tswitch a {\n\tcase 1:\n\tcase 2:\n\tdefault:\n\t}\n\tg := func(x int) int { return x }\n\t_ = g\n}\n",
+    );
+    assert_eq!(count(&file, 0, NodeKind::Case), 2);
+    assert_eq!(file.functions.len(), 2);
+}

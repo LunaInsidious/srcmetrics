@@ -4,6 +4,7 @@
 //! per-language modules. The Metric Engine never imports this module.
 
 mod c;
+mod go;
 mod python;
 mod treesitter;
 mod typescript;
@@ -28,6 +29,7 @@ static ADAPTERS: &[TreeSitterAdapter] = &[
     TreeSitterAdapter::new(&python::MAPPING),
     TreeSitterAdapter::new(&typescript::TYPESCRIPT),
     TreeSitterAdapter::new(&typescript::TSX),
+    TreeSitterAdapter::new(&go::MAPPING),
 ];
 
 pub fn adapters() -> impl Iterator<Item = &'static dyn LanguageAdapter> {

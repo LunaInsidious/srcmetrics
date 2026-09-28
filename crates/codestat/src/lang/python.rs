@@ -56,6 +56,7 @@ pub static MAPPING: Mapping = Mapping {
         ("lambda", Function),
     ],
     logical_operators: &[],
+    else_field: None,
     default_case_keyword: None,
     comments: &["comment"],
     literals: &[

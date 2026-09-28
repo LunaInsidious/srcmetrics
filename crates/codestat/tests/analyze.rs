@@ -18,12 +18,20 @@ fn paths(files: &[FileResult]) -> Vec<&str> {
 
 #[test]
 fn analyzes_supported_files_in_sorted_order() {
+    // equivalence/ holds one `classify.<ext>` (two functions) per supported language.
     let result = analyze(&fixture("equivalence"), None).unwrap();
-    assert_eq!(
-        paths(&result.files),
-        vec!["classify.c", "classify.py", "classify.ts"]
+    let files = paths(&result.files);
+    let mut sorted = files.clone();
+    sorted.sort();
+    assert_eq!(files, sorted);
+    assert!(
+        files.iter().all(|p| p.starts_with("classify.")),
+        "{files:?}"
     );
-    assert_eq!(result.project.metrics["size.function_count"], Some(6.0));
+    assert_eq!(
+        result.project.metrics["size.function_count"],
+        Some(2.0 * files.len() as f64)
+    );
 }
 
 #[test]
@@ -41,7 +49,11 @@ fn records_run_metadata() {
         "{:?}",
         run.parsers
     );
-    assert_eq!(run.parsers.len(), 3);
+    assert_eq!(
+        run.parsers.len(),
+        result.files.len(),
+        "one language per fixture"
+    );
     assert!(run.timestamp.ends_with('Z'), "{}", run.timestamp);
 }
 

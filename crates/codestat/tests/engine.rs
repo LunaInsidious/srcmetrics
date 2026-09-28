@@ -14,9 +14,12 @@ fn parse(name: &str) -> codestat::ir::File {
         .unwrap()
 }
 
+/// Extensions of the `equivalence/classify.*` fixtures: the same algorithm in every language.
+const EQUIVALENCE_LANGUAGES: [&str; 4] = ["c", "py", "ts", "go"];
+
 fn equivalence_program() -> Program {
     Program {
-        files: ["c", "py", "ts"]
+        files: EQUIVALENCE_LANGUAGES
             .map(|ext| parse(&format!("equivalence/classify.{ext}")))
             .into(),
     }
@@ -77,8 +80,9 @@ fn same_algorithm_same_metrics_across_languages() {
                 .collect()
         })
         .collect();
-    assert_eq!(per_language[0], per_language[1], "c vs python");
-    assert_eq!(per_language[0], per_language[2], "c vs typescript");
+    for (i, ext) in EQUIVALENCE_LANGUAGES.iter().enumerate().skip(1) {
+        assert_eq!(per_language[0], per_language[i], "c vs {ext}");
+    }
     let classify = &result.files[0].functions[0];
     assert_eq!(
         classify["complexity.cyclomatic"],

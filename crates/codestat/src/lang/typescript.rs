@@ -77,6 +77,7 @@ pub static TYPESCRIPT: Mapping = Mapping {
     grammar_crate: ("tree-sitter-typescript", "0.23.2"),
     kinds: KINDS,
     logical_operators: &["&&", "||"],
+    else_field: None,
     default_case_keyword: None,
     comments: &["comment"],
     literals: LITERALS,

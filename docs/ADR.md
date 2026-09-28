@@ -358,6 +358,8 @@ Mapping {
 - 名前：Mapping の `name_fields`（例：C は `declarator`、Python は `name`、TypeScript は `name`, `pattern`）を順に辿り、identifier に到達したらそれを名前とする。辿り終えたノードが identifier でなければ、その最初の identifier 子ノードを名前とする（例：Python `x: int`, `*args`）
 - 引数：フィールド `parameters` を関数ノードおよび name_fields の連鎖上で探し、その名前付き子ノード（コメントを除く）を引数とする。`parameters` がなく単数の `parameter` フィールドがある場合（例：JS `x => x`）はそれを唯一の引数とする。どちらもなければ引数 0 個
 - 本体：フィールド `body`
+- 1 つの引数宣言に `name` フィールドが複数ある場合（Go の `a, b int`）は、名前ごとに 1 つの引数とする
+- else 節のノードがない grammar（Go, Java）：Mapping の `else_field`（`alternative`）にある子で、それ自体が `branch` でないものを `else` とする
 - Mapping の追加項目：`logical_operators`（`binary` ノードの `operator` フィールドがこれに一致すれば `logical`）、`default_case_keyword`（`case` ノードの先頭トークンがこれなら default ラベルとして `other`）
 
 Token は具象構文木の葉（comment / literal は部分木ごと）から作り、以下の汎用規則で分類する。
@@ -399,6 +401,7 @@ Token は具象構文木の葉（comment / literal は部分木ごと）から�
 | 2026-09-29 | Accepted | Initial |
 | 2026-09-29 | Accepted | 実装に合わせ、名前・引数の抽出規則、keyword 判定（「含む」）、logical / default case の Mapping 項目を明記 |
 | 2026-09-29 | Accepted | Phase 1 レビュー指摘：template string / f-string 内のコードが IR から消えていたため `interpolations` を追加。幅 0 の葉はトークンにしない |
+| 2026-09-29 | Accepted | Go 追加：`else_field` と、複数名の引数宣言の規則を追加 |
 
 ---
 
