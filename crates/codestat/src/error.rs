@@ -34,7 +34,8 @@ impl fmt::Display for AnalysisError {
                 message,
             } => write!(
                 f,
-                "{path}:{line}:{column}: parse error: {message}; fix the syntax or check that the extension matches the language"
+                "{path}:{line}:{column}: parse error: {message}; fix the syntax, check that the extension matches the language, \
+                 or the code uses a construct the grammar cannot parse (e.g. braces split across #ifdef branches)"
             ),
             AnalysisError::Io { path, message } => {
                 write!(
