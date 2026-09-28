@@ -725,3 +725,78 @@ Share of documented functions.
 | Limitations | Any comment style counts (not only `/**` or `///`). |
 | Reference | - |
 
+## `maintainability.index` — Maintainability Index
+
+Composite maintainability estimate (original, unbounded formula).
+
+| Item | Value |
+|---|---|
+| Definition | MI = 171 - 5.2 * ln(V) - 0.23 * CC - 16.2 * ln(SLOC). |
+| Scope | function, file |
+| Input | halstead.volume (V), complexity.cyclomatic (CC), size.sloc (SLOC) |
+| Calculation | not_applicable unless V > 0 and SLOC > 0. Not rescaled to 0-100. |
+| Unit | index |
+| Language Applicability | partially_language_dependent |
+| Limitations | Inherits the limitations of its inputs; the coefficients were fitted on 1990s code. |
+| Reference | Oman, P. & Hagemeister, J. (1992). Metrics for assessing a software system's maintainability. ICSM. |
+
+## `derived.cyclomatic_per_function` — Cyclomatic Complexity per Function
+
+complexity.cyclomatic / size.function_count.
+
+| Item | Value |
+|---|---|
+| Definition | complexity.cyclomatic / size.function_count. |
+| Scope | file, project |
+| Input | complexity.cyclomatic, size.function_count |
+| Calculation | not_applicable when the denominator is 0 or an input is unavailable. |
+| Unit | ratio |
+| Language Applicability | partially_language_dependent |
+| Limitations | A normalization: its choice of denominator affects comparisons (PLAN.md §16). |
+| Reference | - |
+
+## `derived.tokens_per_loc` — Tokens per LOC
+
+size.token_count / size.loc.
+
+| Item | Value |
+|---|---|
+| Definition | size.token_count / size.loc. |
+| Scope | file, project |
+| Input | size.token_count, size.loc |
+| Calculation | not_applicable when the denominator is 0 or an input is unavailable. |
+| Unit | ratio |
+| Language Applicability | partially_language_dependent |
+| Limitations | A normalization: its choice of denominator affects comparisons (PLAN.md §16). |
+| Reference | - |
+
+## `derived.statements_per_function` — Statements per Function
+
+size.statement_count / size.function_count.
+
+| Item | Value |
+|---|---|
+| Definition | size.statement_count / size.function_count. |
+| Scope | file, project |
+| Input | size.statement_count, size.function_count |
+| Calculation | not_applicable when the denominator is 0 or an input is unavailable. |
+| Unit | ratio |
+| Language Applicability | partially_language_dependent |
+| Limitations | A normalization: its choice of denominator affects comparisons (PLAN.md §16). |
+| Reference | - |
+
+## `derived.duplicate_tokens_per_sloc` — Duplicate Tokens per SLOC
+
+duplication.duplicate_token_count / size.sloc.
+
+| Item | Value |
+|---|---|
+| Definition | duplication.duplicate_token_count / size.sloc. |
+| Scope | file, project |
+| Input | duplication.duplicate_token_count, size.sloc |
+| Calculation | not_applicable when the denominator is 0 or an input is unavailable. |
+| Unit | ratio |
+| Language Applicability | partially_language_dependent |
+| Limitations | A normalization: its choice of denominator affects comparisons (PLAN.md §16). |
+| Reference | - |
+

@@ -5,6 +5,7 @@ mod common;
 mod complexity;
 mod definition;
 mod dependency;
+mod derived;
 mod documentation;
 mod duplication;
 mod function;
@@ -157,18 +158,27 @@ pub fn calculators() -> Vec<Box<dyn Calculator>> {
     ]
 }
 
+/// Definitions of all standard metrics followed by the derived ones.
 pub fn definitions() -> Vec<&'static MetricDefinition> {
-    calculators()
+    let standard: Vec<_> = calculators()
         .iter()
         .flat_map(|c| c.definitions().iter())
-        .collect()
+        .collect();
+    standard.into_iter().chain(derived::definitions()).collect()
 }
 
-/// Runs every calculator over the program.
+/// Runs every calculator over the program, then adds the derived metrics to every scope (ADR-0015).
 pub fn compute(program: &Program) -> ProgramMetrics {
     let mut result = ProgramMetrics::default();
     for calculator in calculators() {
         result.merge(calculator.compute(program));
+    }
+    derived::derive(Scope::Project, &mut result.project);
+    for file in &mut result.files {
+        derived::derive(Scope::File, &mut file.metrics);
+        for function in &mut file.functions {
+            derived::derive(Scope::Function, function);
+        }
     }
     result
 }
