@@ -220,53 +220,86 @@ fn name_depths(edges: &[Vec<usize>]) -> Vec<usize> {
 /// Tarjan's algorithm, iterative (call chains can be long). Returns the component of each node;
 /// components are numbered in reverse topological order (a component's successors have smaller numbers).
 fn strongly_connected_components(edges: &[Vec<usize>]) -> Vec<usize> {
-    const UNVISITED: usize = usize::MAX;
-    let n = edges.len();
-    let (mut index, mut low, mut component) = (vec![UNVISITED; n], vec![0; n], vec![UNVISITED; n]);
-    let (mut on_stack, mut stack) = (vec![false; n], vec![]);
-    let (mut next_index, mut next_component) = (0, 0);
-    for start in 0..n {
-        if index[start] != UNVISITED {
-            continue;
+    let mut tarjan = Tarjan::new(edges.len());
+    for start in 0..edges.len() {
+        if tarjan.index[start] == UNVISITED {
+            tarjan.search(edges, start);
         }
+    }
+    tarjan.component
+}
+
+const UNVISITED: usize = usize::MAX;
+
+struct Tarjan {
+    index: Vec<usize>,
+    low: Vec<usize>,
+    component: Vec<usize>,
+    on_stack: Vec<bool>,
+    stack: Vec<usize>,
+    next_index: usize,
+    next_component: usize,
+}
+
+impl Tarjan {
+    fn new(n: usize) -> Tarjan {
+        Tarjan {
+            index: vec![UNVISITED; n],
+            low: vec![0; n],
+            component: vec![UNVISITED; n],
+            on_stack: vec![false; n],
+            stack: vec![],
+            next_index: 0,
+            next_component: 0,
+        }
+    }
+
+    /// Depth-first search from `start` with an explicit stack of (node, next edge to follow).
+    fn search(&mut self, edges: &[Vec<usize>], start: usize) {
+        self.visit(start);
         let mut frames = vec![(start, 0)];
-        index[start] = next_index;
-        low[start] = next_index;
-        next_index += 1;
-        stack.push(start);
-        on_stack[start] = true;
-        while let Some(&(v, edge)) = frames.last() {
-            if let Some(&w) = edges[v].get(edge) {
-                frames.last_mut().expect("frames is not empty").1 += 1;
-                if index[w] == UNVISITED {
-                    index[w] = next_index;
-                    low[w] = next_index;
-                    next_index += 1;
-                    stack.push(w);
-                    on_stack[w] = true;
+        while let Some(frame) = frames.last_mut() {
+            let (v, edge) = *frame;
+            frame.1 += 1;
+            match edges[v].get(edge) {
+                Some(&w) if self.index[w] == UNVISITED => {
+                    self.visit(w);
                     frames.push((w, 0));
-                } else if on_stack[w] {
-                    low[v] = low[v].min(index[w]);
                 }
-                continue;
-            }
-            frames.pop();
-            if let Some(&(parent, _)) = frames.last() {
-                low[parent] = low[parent].min(low[v]);
-            }
-            if low[v] == index[v] {
-                while let Some(w) = stack.pop() {
-                    on_stack[w] = false;
-                    component[w] = next_component;
-                    if w == v {
-                        break;
+                Some(&w) if self.on_stack[w] => self.low[v] = self.low[v].min(self.index[w]),
+                Some(_) => {}
+                None => {
+                    frames.pop();
+                    if let Some(&(parent, _)) = frames.last() {
+                        self.low[parent] = self.low[parent].min(self.low[v]);
+                    }
+                    if self.low[v] == self.index[v] {
+                        self.close_component(v);
                     }
                 }
-                next_component += 1;
             }
         }
     }
-    component
+
+    fn visit(&mut self, v: usize) {
+        self.index[v] = self.next_index;
+        self.low[v] = self.next_index;
+        self.next_index += 1;
+        self.stack.push(v);
+        self.on_stack[v] = true;
+    }
+
+    /// Pops the component rooted at `root` off the stack.
+    fn close_component(&mut self, root: usize) {
+        while let Some(w) = self.stack.pop() {
+            self.on_stack[w] = false;
+            self.component[w] = self.next_component;
+            if w == root {
+                break;
+            }
+        }
+        self.next_component += 1;
+    }
 }
 
 #[cfg(test)]
