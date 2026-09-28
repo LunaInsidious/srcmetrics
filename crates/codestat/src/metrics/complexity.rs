@@ -91,8 +91,9 @@ impl Calculator for ComplexityCalculator {
     fn compute(&self, program: &Program) -> ProgramMetrics {
         let mut result = per_file(
             program,
-            |file| Counts::of(file.nodes.iter()).metrics(),
-            function_metrics,
+            path_counts,
+            |file, _| Counts::of(file.nodes.iter()).metrics(),
+            |file, paths, function| function_metrics(file, paths, function),
         );
         let project = program
             .files
@@ -104,16 +105,13 @@ impl Calculator for ComplexityCalculator {
     }
 }
 
-fn function_metrics(file: &File, function: &Function) -> Metrics {
+fn function_metrics(file: &File, paths: &[f64], function: &Function) -> Metrics {
     let counts = Counts {
         functions: 1,
         ..Counts::of(file.function_nodes(function))
     };
     let mut m = counts.metrics();
-    m.insert(
-        "complexity.path_count",
-        paths(file, file.node(function.node)).into(),
-    );
+    m.insert("complexity.path_count", paths[function.node.0].into());
     m
 }
 
@@ -175,52 +173,51 @@ impl Counts {
     }
 }
 
-/// Number of acyclic paths through `node` (ADR-0011).
-fn paths(file: &File, node: &Node) -> f64 {
-    match node.kind {
-        NodeKind::Branch if !is_continuation(file, node) => {
-            let (arms, has_else) = chain_arms(file, node);
-            arms + if has_else { 0.0 } else { 1.0 }
-        }
-        NodeKind::Loop | NodeKind::Conditional => sequence(file, &node.children) + 1.0,
-        _ => sequence(file, &node.children),
+/// Number of acyclic paths through every node (ADR-0011), indexed by `NodeId`.
+///
+/// Computed in reverse arena order, i.e. children before parents (the arena is pre-order), so
+/// deep trees such as long `else if` ladders take linear time and no recursion.
+fn path_counts(file: &File) -> Vec<f64> {
+    let mut paths = vec![1.0; file.nodes.len()];
+    // For branches: (sum of the paths of the chain's arms from this branch on, chain ends with else).
+    let mut arms = vec![(0.0, false); file.nodes.len()];
+    for node in file.nodes.iter().rev() {
+        let i = node.id.0;
+        paths[i] = match node.kind {
+            NodeKind::Branch => {
+                arms[i] = chain_arms(file, &paths, &arms, node);
+                arms[i].0 + if arms[i].1 { 0.0 } else { 1.0 }
+            }
+            NodeKind::Loop | NodeKind::Conditional => sequence(file, &paths, &node.children) + 1.0,
+            _ => sequence(file, &paths, &node.children),
+        };
     }
+    paths
 }
 
-/// Sum of the paths of every arm of an if-chain, and whether it ends with an `else`.
-/// Handles both chain shapes: C-style (`else { if ... }`) and Python-style (`elif` children).
-fn chain_arms(file: &File, branch: &Node) -> (f64, bool) {
-    let is_arm_link = |n: &Node| n.kind == NodeKind::Else || is_continuation(file, n);
-    let then: Vec<NodeId> = branch
-        .children
-        .iter()
-        .copied()
-        .filter(|c| !is_arm_link(file.node(*c)))
-        .collect();
-    let (mut sum, mut has_else) = (sequence(file, &then), false);
-    for child in branch
-        .children
-        .iter()
-        .map(|c| file.node(*c))
-        .filter(|c| is_arm_link(c))
-    {
-        let continuation = if child.kind == NodeKind::Else {
-            child
-                .children
+/// Arms of the if-chain starting at `branch`: the sum of their paths and whether the chain ends
+/// with an `else`. Handles both chain shapes: C-style (`else { if ... }`) and Python-style (`elif` children).
+fn chain_arms(file: &File, paths: &[f64], arms: &[(f64, bool)], branch: &Node) -> (f64, bool) {
+    let is_link = |n: &Node| n.kind == NodeKind::Else || is_continuation(file, n);
+    let children = || branch.children.iter().map(|c| file.node(*c));
+    let then: Vec<NodeId> = children().filter(|c| !is_link(c)).map(|c| c.id).collect();
+    let (mut sum, mut has_else) = (sequence(file, paths, &then), false);
+    for link in children().filter(|c| is_link(c)) {
+        let next = if link.kind == NodeKind::Else {
+            link.children
                 .iter()
-                .map(|c| file.node(*c))
-                .find(|c| is_continuation(file, c))
+                .copied()
+                .find(|c| is_continuation(file, file.node(*c)))
         } else {
-            Some(child)
+            Some(link.id)
         };
-        match continuation {
+        match next {
             Some(next) => {
-                let (s, e) = chain_arms(file, next);
-                sum += s;
-                has_else |= e;
+                sum += arms[next.0].0;
+                has_else |= arms[next.0].1;
             }
             None => {
-                sum += paths(file, child);
+                sum += paths[link.id.0];
                 has_else = true;
             }
         }
@@ -230,17 +227,15 @@ fn chain_arms(file: &File, branch: &Node) -> (f64, bool) {
 
 /// Paths through children executed in order. Runs of consecutive `case` or `catch` siblings are
 /// alternatives (sum + 1); everything else multiplies. Nested functions count as 1.
-fn sequence(file: &File, children: &[NodeId]) -> f64 {
+fn sequence(file: &File, paths: &[f64], children: &[NodeId]) -> f64 {
     let kind = |id: &NodeId| file.node(*id).kind;
     let is_alternative = |k: NodeKind| matches!(k, NodeKind::Case | NodeKind::Catch);
     children
         .chunk_by(|a, b| is_alternative(kind(a)) && kind(a) == kind(b))
         .map(|run| match kind(&run[0]) {
-            k if is_alternative(k) => {
-                run.iter().map(|c| paths(file, file.node(*c))).sum::<f64>() + 1.0
-            }
+            k if is_alternative(k) => run.iter().map(|c| paths[c.0]).sum::<f64>() + 1.0,
             NodeKind::Function => 1.0,
-            _ => paths(file, file.node(run[0])),
+            _ => paths[run[0].0],
         })
         .product()
 }

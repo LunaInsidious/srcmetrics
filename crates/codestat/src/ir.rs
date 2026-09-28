@@ -103,6 +103,8 @@ pub struct File {
     pub path: String,
     pub language: String,
     pub source: String,
+    /// Nodes in pre-order: a parent always precedes its children (`parent.id < child.id`).
+    /// Calculators rely on this to compute per-node values in a single linear pass.
     pub nodes: Vec<Node>,
     pub root: NodeId,
     pub tokens: Vec<Token>,

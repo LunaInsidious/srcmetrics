@@ -549,9 +549,14 @@ PLAN §8.1, §8.2 はメトリクス名を挙げるだけで、行の分類・�
 ### Negative
 - C / TS で波括弧なしに if を直接入れ子にした場合（`if (a) if (b) x;`）は継続と誤認される（MetricDefinition の limitations に記載）
 
+## Implementation Notes
+
+- C 系の `else if` の連鎖は IR 上で腕ごとに 1 段ずつ深くなる（Branch → Else → Branch …）。ネストのレベルは祖先をたどらず、arena の前順（親が先）を利用して 1 回の走査で全ノード分を計算する（Phase 2 レビュー指摘：祖先をたどる実装は数百の腕で O(N²) になる）
+
 ## Validation
 
 - [x] 同じアルゴリズムの C / Python / TypeScript 版で Cyclomatic と Max Nesting が一致するテスト（`tests/engine.rs`）
+- [x] 2 万本の腕を持つ `else if` の連鎖を線形時間で処理するテスト（`tests/engine.rs`）
 
 ## Revision History
 
@@ -784,6 +789,10 @@ Nejmeh の NPATH は「条件式」と「then / else の本体」を区別して
 **Rejected because:** 簡単な構造規則で意味のある値を出せるため
 
 ## Consequences
+
+## Implementation Notes
+
+- 経路数は arena の逆順（子が先）に 1 回走査して全ノード分を計算する。再帰しないので、深い `else if` の連鎖でもスタックを溢れさせない（Phase 2 レビュー指摘）
 
 ### Negative
 - 短絡演算子による経路は数えない。三項演算子の 2 つの値の経路数は区別しない（子の積 ＋ 1 で近似）

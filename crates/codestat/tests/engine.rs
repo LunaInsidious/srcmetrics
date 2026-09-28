@@ -114,3 +114,36 @@ fn metric_engine_does_not_depend_on_parsers_or_languages() {
         }
     }
 }
+
+/// Real C code has `else if` ladders with hundreds of arms; in the IR each arm nests one level
+/// deeper (Branch -> Else -> Branch ...). Metrics must stay linear and must not recurse per level.
+#[test]
+fn long_else_if_ladders_are_handled_in_linear_time() {
+    let arms = 20_000;
+    let mut source = String::from("int f(int x) {\n  if (x == 0) { x = 1; }\n");
+    for i in 1..arms {
+        source += &format!("  else if (x == {i}) {{ x = 1; }}\n");
+    }
+    source += "  return x;\n}\n";
+    let file = adapter_for_path("ladder.c")
+        .unwrap()
+        .to_ir("ladder.c", &source)
+        .unwrap();
+    let started = std::time::Instant::now();
+    let result = metrics::compute(&Program { files: vec![file] });
+    let f = &result.files[0].functions[0];
+    assert_eq!(f["nesting.max_depth"], MetricValue::Available(1.0));
+    assert_eq!(
+        f["complexity.path_count"],
+        MetricValue::Available((arms + 1) as f64)
+    );
+    assert_eq!(
+        f["complexity.cyclomatic"],
+        MetricValue::Available((arms + 1) as f64)
+    );
+    assert!(
+        started.elapsed().as_secs() < 5,
+        "took {:?}",
+        started.elapsed()
+    );
+}

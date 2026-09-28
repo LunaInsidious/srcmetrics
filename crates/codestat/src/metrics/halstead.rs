@@ -122,8 +122,9 @@ impl Calculator for HalsteadCalculator {
     fn compute(&self, program: &Program) -> ProgramMetrics {
         let mut result = per_file(
             program,
-            |file| Counts::of(&file.tokens).metrics(),
-            |file, function| Counts::of(file.tokens_in(function.range)).metrics(),
+            |_| (),
+            |file, _| Counts::of(&file.tokens).metrics(),
+            |file, _, function| Counts::of(file.tokens_in(function.range)).metrics(),
         );
         let all: Vec<&Token> = program.files.iter().flat_map(|f| &f.tokens).collect();
         result.project = Counts::of(all).metrics();

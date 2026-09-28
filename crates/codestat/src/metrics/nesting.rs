@@ -1,6 +1,6 @@
 //! Nesting Metrics (PLAN.md §8.2 Maximum / Average Nesting Depth).
 
-use super::common::{is_continuation, is_nesting, is_statement, nesting_level};
+use super::common::{is_continuation, is_nesting, is_statement, nesting_levels};
 use super::{
     Applicability::*, Calculator, MetricDefinition, MetricValue, Metrics, ProgramMetrics, Scope::*,
     per_file,
@@ -50,17 +50,24 @@ impl Calculator for NestingCalculator {
     fn compute(&self, program: &Program) -> ProgramMetrics {
         let mut result = per_file(
             program,
-            |file| Summary::of(file, file.nodes.iter()).metrics(),
-            |file, function| Summary::of(file, file.function_nodes(function)).metrics(),
+            levels,
+            |file, levels| Summary::of(file, levels, file.nodes.iter()).metrics(),
+            |file, levels, function| {
+                Summary::of(file, levels, file.function_nodes(function)).metrics()
+            },
         );
         let project = program
             .files
             .iter()
-            .map(|f| Summary::of(f, f.nodes.iter()))
+            .map(|f| Summary::of(f, &levels(f), f.nodes.iter()))
             .fold(Summary::default(), Summary::add);
         result.project = project.metrics();
         result
     }
+}
+
+fn levels(file: &File) -> Vec<usize> {
+    nesting_levels(file, |n| is_nesting(n.kind))
 }
 
 #[derive(Default)]
@@ -71,14 +78,15 @@ struct Summary {
 }
 
 impl Summary {
-    fn of<'a>(file: &'a File, nodes: impl Iterator<Item = &'a Node>) -> Summary {
+    fn of<'a>(file: &'a File, levels: &[usize], nodes: impl Iterator<Item = &'a Node>) -> Summary {
         let mut s = Summary::default();
         for node in nodes {
+            let level = levels[node.id.0];
             if is_nesting(node.kind) && !is_continuation(file, node) {
-                s.max_depth = s.max_depth.max(nesting_level(file, node) + 1);
+                s.max_depth = s.max_depth.max(level + 1);
             }
             if is_statement(node.kind) {
-                s.level_sum += nesting_level(file, node);
+                s.level_sum += level;
                 s.statements += 1;
             }
         }

@@ -165,7 +165,12 @@ impl Calculator for SizeCalculator {
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {
-        let mut result = per_file(program, |file| totals(&[file]), function_metrics);
+        let mut result = per_file(
+            program,
+            |_| (),
+            |file, _| totals(&[file]),
+            |f, _, func| function_metrics(f, func),
+        );
         let files: Vec<&File> = program.files.iter().collect();
         result.project = totals(&files);
         result

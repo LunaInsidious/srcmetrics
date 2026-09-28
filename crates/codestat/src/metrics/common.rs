@@ -77,23 +77,38 @@ pub(crate) fn is_continuation(file: &File, node: &Node) -> bool {
             .is_some_and(|p| matches!(file.node(p).kind, NodeKind::Else | NodeKind::Branch))
 }
 
-/// Number of nesting levels enclosing `node` within its function (or top-level code).
-/// A continuation branch has the level of its chain head.
-pub(crate) fn nesting_level(file: &File, node: &Node) -> usize {
-    file.ancestors(chain_head(file, node).id)
-        .take_while(|a| a.kind != NodeKind::Function)
-        .filter(|a| is_nesting(a.kind) && !is_continuation(file, a))
-        .count()
-}
-
-/// The first branch of the if-chain `node` continues; `node` itself if it is not a continuation.
-fn chain_head<'a>(file: &'a File, node: &'a Node) -> &'a Node {
-    let mut n = node;
-    while is_continuation(file, n) {
-        n = file
-            .ancestors(n.id)
-            .find(|a| a.kind == NodeKind::Branch)
-            .expect("a continuation branch always has a branch ancestor");
+/// Nesting level of every node (indexed by `NodeId`): the number of enclosing nodes for which
+/// `opens_level` holds, counted within the node's function (levels restart inside nested functions).
+/// A continuation branch (`else if`, `elif`) has the level of its chain head (ADR-0007).
+///
+/// One pass in arena order, which is pre-order (parents first), so deep trees such as long
+/// `else if` ladders cost O(nodes) and no recursion.
+pub(crate) fn nesting_levels(file: &File, opens_level: impl Fn(&Node) -> bool) -> Vec<usize> {
+    let mut own = vec![0; file.nodes.len()];
+    // Level of the children of each node.
+    let mut inner = vec![0; file.nodes.len()];
+    for node in &file.nodes {
+        let i = node.id.0;
+        own[i] = match node.parent {
+            None => 0,
+            Some(p) if is_continuation(file, node) => {
+                // Same level as the branch this one continues (the parent, or the else's parent).
+                let owner = if file.node(p).kind == NodeKind::Else {
+                    file.node(p)
+                        .parent
+                        .expect("an else node always has a parent")
+                } else {
+                    p
+                };
+                own[owner.0]
+            }
+            Some(p) => inner[p.0],
+        };
+        inner[i] = if node.kind == NodeKind::Function {
+            0
+        } else {
+            own[i] + usize::from(opens_level(node))
+        };
     }
-    n
+    own
 }

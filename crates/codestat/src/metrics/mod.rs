@@ -112,21 +112,26 @@ pub trait Calculator {
 }
 
 /// Builds `ProgramMetrics` for calculators whose file and function values depend only on that file.
-pub(crate) fn per_file(
+/// `prepare` computes per-file data shared by the file and all its functions (computed once).
+pub(crate) fn per_file<T>(
     program: &Program,
-    file_metrics: impl Fn(&File) -> Metrics,
-    function_metrics: impl Fn(&File, &Function) -> Metrics,
+    prepare: impl Fn(&File) -> T,
+    file_metrics: impl Fn(&File, &T) -> Metrics,
+    function_metrics: impl Fn(&File, &T, &Function) -> Metrics,
 ) -> ProgramMetrics {
     let files = program
         .files
         .iter()
-        .map(|file| FileMetrics {
-            metrics: file_metrics(file),
-            functions: file
-                .functions
-                .iter()
-                .map(|f| function_metrics(file, f))
-                .collect(),
+        .map(|file| {
+            let prepared = prepare(file);
+            FileMetrics {
+                metrics: file_metrics(file, &prepared),
+                functions: file
+                    .functions
+                    .iter()
+                    .map(|f| function_metrics(file, &prepared, f))
+                    .collect(),
+            }
         })
         .collect();
     ProgramMetrics {

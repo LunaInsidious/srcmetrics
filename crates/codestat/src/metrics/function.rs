@@ -88,7 +88,12 @@ impl Calculator for FunctionCalculator {
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {
-        let mut result = per_file(program, |f| file_metrics(&[f]), function_metrics);
+        let mut result = per_file(
+            program,
+            |_| (),
+            |f, _| file_metrics(&[f]),
+            |f, _, func| function_metrics(f, func),
+        );
         result.project = file_metrics(&program.files.iter().collect::<Vec<_>>());
         result
     }
