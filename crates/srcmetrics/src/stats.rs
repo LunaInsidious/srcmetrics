@@ -57,7 +57,7 @@ pub fn units(results: &[AnalysisResult], scope: UnitScope) -> Vec<Unit> {
 
 /// Metric ids defined at `scope`, in definition order.
 pub fn metric_ids(scope: UnitScope) -> Vec<&'static str> {
-    metrics::definitions()
+    metrics::specs()
         .into_iter()
         .filter(|d| d.scopes.contains(&scope.scope()))
         .map(|d| d.id)

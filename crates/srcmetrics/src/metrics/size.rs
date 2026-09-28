@@ -3,254 +3,61 @@
 //! Size metrics are textual: at function scope they include the text of nested functions.
 
 use super::common::{LineClass, is_statement, line_classes};
-use super::{
-    Applicability::*, Calculator, FileMetrics, Ja, MetricDefinition, MetricValue, Metrics,
-    ProgramMetrics, Scope::*,
-};
+use super::{Calculator, FileMetrics, MetricSpec, MetricValue, Metrics, ProgramMetrics, Scope::*};
 use crate::ir::{File, Function, Program, TokenKind};
 
 pub struct SizeCalculator;
 
-const LINES: &str = "File source text, Token ranges";
-
-static DEFINITIONS: &[MetricDefinition] = &[
-    MetricDefinition {
+static SPECS: &[MetricSpec] = &[
+    MetricSpec {
         id: "size.loc",
-        name: "LOC",
-        description: "Physical lines of code.",
-        definition: "Number of lines in the file.",
         scopes: &[File, Project],
-        input: "File source text",
-        calculation: "Count of lines; a trailing newline does not start a new line. Project: sum over files.",
-        unit: "lines",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "LOC",
-            description: "物理行数。",
-            definition: "ファイルの行数。",
-            input: "ファイルのソーステキスト",
-            calculation: "行数を数える。末尾の改行は新しい行を作らない。プロジェクト：ファイルの合計。",
-            limitations: "",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.sloc",
-        name: "SLOC",
-        description: "Source lines of code.",
-        definition: "Lines occupied by at least one non-comment token.",
         scopes: &[Function, File, Project],
-        input: LINES,
-        calculation: "A token spanning several lines (e.g. a multi-line string) occupies each of them. \
-                      Function: lines of the function's range (including nested functions). Project: sum.",
-        unit: "lines",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "SLOC",
-            description: "ソースコードの行数。",
-            definition: "コメント以外のトークンが 1 つ以上ある行。",
-            input: "ファイルのソーステキスト、トークンの範囲",
-            calculation: "複数行にわたるトークン（複数行の文字列など）は、またがるすべての行を占める。関数：関数の範囲の行（入れ子関数を含む）。プロジェクト：合計。",
-            limitations: "",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.comment_loc",
-        name: "Comment LOC",
-        description: "Lines containing only comments.",
-        definition: "Lines occupied by a comment token and by no other token.",
         scopes: &[File, Project],
-        input: LINES,
-        calculation: "Lines with code and a trailing comment are SLOC, not Comment LOC. Project: sum.",
-        unit: "lines",
-        applicability: LanguageIndependent,
-        limitations: "Documentation strings that are string literals (e.g. Python docstrings) count as SLOC.",
-        reference: "",
-        ja: Ja {
-            name: "コメント行数",
-            description: "コメントだけの行。",
-            definition: "コメントトークンがあり、他のトークンがない行。",
-            input: "ファイルのソーステキスト、トークンの範囲",
-            calculation: "コードと行末コメントがある行は SLOC で、コメント行ではない。プロジェクト：合計。",
-            limitations: "文字列リテラルとして書くドキュメント（Python の docstring など）は SLOC に数える。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.blank_loc",
-        name: "Blank LOC",
-        description: "Blank lines.",
-        definition: "Whitespace-only lines not occupied by any token.",
         scopes: &[File, Project],
-        input: LINES,
-        calculation: "Blank lines inside a multi-line comment or string are not blank. Project: sum.",
-        unit: "lines",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "空行数",
-            description: "空行。",
-            definition: "どのトークンにも占められていない、空白だけの行。",
-            input: "ファイルのソーステキスト、トークンの範囲",
-            calculation: "複数行のコメントや文字列の中の空行は空行ではない。プロジェクト：合計。",
-            limitations: "",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.comment_ratio",
-        name: "Comment Ratio",
-        description: "Share of comment lines.",
-        definition: "Comment LOC / LOC.",
         scopes: &[File, Project],
-        input: "size.comment_loc, size.loc",
-        calculation: "not_applicable when LOC is 0. Project: ratio of the sums.",
-        unit: "ratio",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "コメント率",
-            description: "コメント行の割合。",
-            definition: "コメント行数 / LOC。",
-            input: "size.comment_loc, size.loc",
-            calculation: "LOC が 0 なら not_applicable。プロジェクト：合計どうしの比。",
-            limitations: "",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.statement_count",
-        name: "Statement Count",
-        description: "Number of statements.",
-        definition: "Nodes of kind statement, declaration, branch, loop, return or jump.",
         scopes: &[Function, File, Project],
-        input: "Node kinds",
-        calculation: "Function scope includes nested functions. Project: sum.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Languages differ in what is a statement (e.g. C for-loop initializer declarations count; Python has no equivalent).",
-        reference: "",
-        ja: Ja {
-            name: "文の数",
-            description: "文の数。",
-            definition: "statement, declaration, branch, loop, return, jump の種類のノード。",
-            input: "ノードの種類",
-            calculation: "関数スコープは入れ子関数を含む。プロジェクト：合計。",
-            limitations: "何を文とみなすかは言語によって異なる（例：C の for の初期化子の宣言は数えるが、Python には相当するものがない）。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.token_count",
-        name: "Token Count",
-        description: "Number of non-comment tokens.",
-        definition: "Tokens of every kind except comment.",
         scopes: &[Function, File, Project],
-        input: "Tokens",
-        calculation: "A string literal is one token. Function scope includes nested functions. Project: sum.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Token granularity follows each grammar (e.g. C `#include` is one token).",
-        reference: "",
-        ja: Ja {
-            name: "トークン数",
-            description: "コメント以外のトークンの数。",
-            definition: "コメント以外のすべての種類のトークン。",
-            input: "トークン",
-            calculation: "文字列リテラルは 1 トークン。関数スコープは入れ子関数を含む。プロジェクト：合計。",
-            limitations: "トークンの粒度は各言語の文法に従う（例：C の `#include` は 1 トークン）。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.function_count",
-        name: "Function Count",
-        description: "Number of functions.",
-        definition: "Functions in the IR, including methods, nested and anonymous functions.",
         scopes: &[File, Project],
-        input: "Functions",
-        calculation: "Project: sum.",
-        unit: "count",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "関数の数",
-            description: "関数の数。",
-            definition: "IR 上の関数。メソッド、入れ子の関数、無名関数を含む。",
-            input: "関数",
-            calculation: "プロジェクト：合計。",
-            limitations: "",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.function_length",
-        name: "Function Length",
-        description: "Lines spanned by a function.",
-        definition: "Last line - first line + 1 of the function's source range.",
         scopes: &[Function],
-        input: "Function source range",
-        calculation: "Includes the signature, blank and comment lines, and nested functions.",
-        unit: "lines",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "関数の長さ",
-            description: "関数がまたがる行数。",
-            definition: "関数のソース範囲の、最終行 − 先頭行 + 1。",
-            input: "関数のソース範囲",
-            calculation: "シグネチャ、空行、コメント行、入れ子関数を含む。",
-            limitations: "",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.avg_function_length",
-        name: "Average Function Length",
-        description: "Mean Function Length.",
-        definition: "Mean of size.function_length over all functions.",
         scopes: &[File, Project],
-        input: "size.function_length",
-        calculation: "not_applicable when there are no functions.",
-        unit: "lines",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "平均関数長",
-            description: "関数の長さの平均。",
-            definition: "全関数の size.function_length の平均。",
-            input: "size.function_length",
-            calculation: "関数がなければ not_applicable。",
-            limitations: "",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "size.max_function_length",
-        name: "Maximum Function Length",
-        description: "Longest Function Length.",
-        definition: "Maximum of size.function_length over all functions.",
         scopes: &[File, Project],
-        input: "size.function_length",
-        calculation: "not_applicable when there are no functions.",
-        unit: "lines",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "最大関数長",
-            description: "最も長い関数の長さ。",
-            definition: "全関数の size.function_length の最大値。",
-            input: "size.function_length",
-            calculation: "関数がなければ not_applicable。",
-            limitations: "",
-        },
     },
 ];
 
 impl Calculator for SizeCalculator {
-    fn definitions(&self) -> &'static [MetricDefinition] {
-        DEFINITIONS
+    fn specs(&self) -> &'static [MetricSpec] {
+        SPECS
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {

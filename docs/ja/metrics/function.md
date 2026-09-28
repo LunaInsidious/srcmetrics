@@ -1,5 +1,3 @@
-<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->
-
 # 関数
 
 ## 引数の数 {#function-parameter-count}

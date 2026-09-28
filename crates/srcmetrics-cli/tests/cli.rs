@@ -74,39 +74,6 @@ fn analyze_fails_with_a_message_for_a_missing_path() {
 }
 
 #[test]
-fn metrics_lists_definitions_as_json() {
-    let value = json(&srcmetrics(&["metrics"]));
-    let ids: Vec<_> = value
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|d| d["id"].as_str().unwrap().to_string())
-        .collect();
-    assert!(ids.contains(&"complexity.cyclomatic".to_string()));
-    let cyclomatic = value
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|d| d["id"] == "complexity.cyclomatic")
-        .unwrap();
-    assert_eq!(
-        cyclomatic["scopes"],
-        serde_json::json!(["function", "file", "project"])
-    );
-    assert_eq!(cyclomatic["applicability"], "partially_language_dependent");
-}
-
-#[test]
-fn metrics_markdown_renders_every_definition() {
-    let output = srcmetrics(&["metrics", "--format", "markdown"]);
-    let definitions = srcmetrics::metrics::definitions();
-    assert_eq!(
-        String::from_utf8(output.stdout).unwrap(),
-        srcmetrics::metrics::to_markdown(&definitions)
-    );
-}
-
-#[test]
 fn analyze_can_print_csv() {
     let output = srcmetrics(&["analyze", &fixture("mixed"), "--format", "csv"]);
     assert!(output.status.success());

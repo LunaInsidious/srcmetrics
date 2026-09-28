@@ -1,40 +1,42 @@
-//! The metric reference pages of the documentation site (docs/metrics/, docs/ja/metrics/) must
-//! match the metric definitions in code (AGENTS.md: docs are part of the task; ADR-0025).
+//! Every metric id in the code is documented in the English and Japanese metric reference pages,
+//! and the pages document no other ids (ADR-0026). The explanations themselves are written by hand.
 
-use srcmetrics::metrics::{self, Lang};
+use srcmetrics::metrics;
 use std::collections::BTreeSet;
 
-fn check(dir: &str, lang: Lang) {
+/// Metric ids documented in the pages of `dir`: each metric section starts with a line
+/// "`<id>` — <description>".
+fn documented_ids(dir: &str) -> BTreeSet<String> {
     let dir = format!("{}/../../{dir}", env!("CARGO_MANIFEST_DIR"));
-    let pages = metrics::reference_pages(&metrics::definitions(), lang);
-    if std::env::var_os("UPDATE_DOCS").is_some() {
-        std::fs::create_dir_all(&dir).unwrap();
-        for (name, content) in &pages {
-            std::fs::write(format!("{dir}/{name}"), content).unwrap();
+    let mut ids = BTreeSet::new();
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+        for line in text.lines() {
+            if let Some(id) = line
+                .strip_prefix('`')
+                .and_then(|rest| rest.split_once("` — "))
+                .map(|(id, _)| id)
+            {
+                assert!(
+                    ids.insert(id.to_string()),
+                    "{dir}: {id} is documented twice"
+                );
+            }
         }
     }
-    let hint = "run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`";
-    for (name, content) in &pages {
-        let current = std::fs::read_to_string(format!("{dir}/{name}")).unwrap_or_default();
-        assert!(&current == content, "{dir}/{name} is out of date; {hint}");
-    }
-    let expected: BTreeSet<String> = pages.into_iter().map(|(name, _)| name).collect();
-    let actual: BTreeSet<String> = std::fs::read_dir(&dir)
-        .unwrap()
-        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
-        .collect();
-    assert_eq!(
-        actual, expected,
-        "{dir} has pages for metric groups that no longer exist"
-    );
+    ids
+}
+
+fn code_ids() -> BTreeSet<String> {
+    metrics::specs().iter().map(|s| s.id.to_string()).collect()
 }
 
 #[test]
-fn english_metric_reference_is_up_to_date() {
-    check("docs/metrics", Lang::En);
+fn english_metric_reference_documents_every_metric() {
+    assert_eq!(documented_ids("docs/metrics"), code_ids());
 }
 
 #[test]
-fn japanese_metric_reference_is_up_to_date() {
-    check("docs/ja/metrics", Lang::Ja);
+fn japanese_metric_reference_documents_every_metric() {
+    assert_eq!(documented_ids("docs/ja/metrics"), code_ids());
 }

@@ -5,15 +5,15 @@ import { defineConfig, type DefaultTheme } from 'vitepress'
 // User documentation (ADR-0023). Developer documents live in design/ and are not published.
 
 
-// The metric reference pages are generated from the code (docs/metrics/, docs/ja/metrics/). List them in the order
-// the generated overview links to them, which is the definition order.
+// Metric reference pages (docs/metrics/, docs/ja/metrics/): list them in the order the overview page
+// links to them.
 function metricPages(prefix: string): DefaultTheme.SidebarItem[] {
   const metricsDir = fileURLToPath(new URL(`..${prefix}/metrics`, import.meta.url))
   const overview = readFileSync(`${metricsDir}/index.md`, 'utf8')
   const groups = [...new Set([...overview.matchAll(/\]\(\.\/([a-z_]+)#/g)].map((m) => m[1]))]
   const files = readdirSync(metricsDir).filter((f) => f !== 'index.md')
   if (files.length !== groups.length) {
-    throw new Error(`docs${prefix}/metrics/ is out of date; regenerate with UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`)
+    throw new Error(`docs${prefix}/metrics/index.md must link to every page of docs${prefix}/metrics/`)
   }
   return groups.map((group) => {
     const title = readFileSync(`${metricsDir}/${group}.md`, 'utf8').match(/^# (.+)$/m)

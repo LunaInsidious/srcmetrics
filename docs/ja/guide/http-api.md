@@ -9,7 +9,6 @@ srcmetrics serve [--bind 127.0.0.1] [--port 8080]
 | エンドポイント | |
 |---|---|
 | `GET /` | Web UI：コードを貼り付け、ファイル名を付けてメトリクスを表示 |
-| `GET /api/metrics` | メトリクス定義（JSON） |
 | `POST /api/analyze` | 1 ファイルを解析 |
 
 ## `POST /api/analyze`

@@ -1,135 +1,45 @@
 //! Complexity Metrics (ADR-0007, ADR-0011).
 
 use super::common::{is_continuation, is_decision};
-use super::{
-    Applicability::*, Calculator, Ja, MetricDefinition, Metrics, ProgramMetrics, Scope::*, per_file,
-};
+use super::{Calculator, MetricSpec, Metrics, ProgramMetrics, Scope::*, per_file};
 use crate::ir::{File, Function, Node, NodeId, NodeKind, Program};
 
 pub struct ComplexityCalculator;
 
-const ALL_SCOPES: &[super::Scope] = &[Function, File, Project];
-
-const fn count(
-    id: &'static str,
-    name: &'static str,
-    definition: &'static str,
-    ja_name: &'static str,
-    ja_definition: &'static str,
-) -> MetricDefinition {
-    MetricDefinition {
-        id,
-        name,
-        description: definition,
-        definition,
-        scopes: ALL_SCOPES,
-        input: "Node kinds",
-        calculation: "Function: excluding nested functions. File: the whole file. Project: sum over files.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Which constructs map to each node kind follows each language Mapping.",
-        reference: "",
-        ja: Ja {
-            name: ja_name,
-            description: ja_definition,
-            definition: ja_definition,
-            input: "ノードの種類",
-            calculation: "関数：入れ子関数を除く。ファイル：ファイル全体。プロジェクト：ファイルの合計。",
-            limitations: "どの構文がどのノードの種類になるかは、言語ごとの Mapping に従う。",
-        },
-    }
-}
-
-static DEFINITIONS: &[MetricDefinition] = &[
-    MetricDefinition {
+static SPECS: &[MetricSpec] = &[
+    MetricSpec {
         id: "complexity.cyclomatic",
-        name: "Cyclomatic Complexity",
-        description: "Number of linearly independent paths (McCabe).",
-        definition: "1 + number of decision points in a function.",
-        scopes: ALL_SCOPES,
-        input: "Node kinds: branch, loop, case, catch, logical, conditional",
-        calculation: "Function: 1 + decision nodes, excluding nested functions. Each `else if` / `elif`, \
-                      each short-circuit operator (&&, ||, and, or), each ternary and each non-default case \
-                      label is one decision. File: sum over its functions + decisions in top-level code. \
-                      Project: sum over files.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Which constructs are decisions follows each language Mapping (e.g. Python comprehension \
-                      `for`/`if` clauses count; Python `case _:` and Rust `_ =>` count as cases).",
-        reference: "McCabe, T. J. (1976). A Complexity Measure. IEEE TSE SE-2(4).",
-        ja: Ja {
-            name: "Cyclomatic Complexity",
-            description: "線形独立な経路の数（McCabe）。",
-            definition: "1 + 関数内の判定点の数。",
-            input: "ノードの種類：branch, loop, case, catch, logical, conditional",
-            calculation: "関数：1 + 判定ノードの数（入れ子関数を除く）。`else if` / `elif`、短絡演算子（&&, ||, and, or）、三項演算子、default 以外の case ラベルがそれぞれ 1 つの判定点。ファイル：関数の合計 + トップレベルのコードの判定点。プロジェクト：ファイルの合計。",
-            limitations: "何を判定点とするかは言語ごとの Mapping に従う（例：Python の内包表記の `for` / `if` は数える。Python の `case _:` と Rust の `_ =>` は case として数える）。",
-        },
+        scopes: &[Function, File, Project],
     },
-    count(
-        "complexity.branch_count",
-        "Branch Count",
-        "Number of branch nodes (if, else if, elif) plus non-default case labels.",
-        "分岐の数",
-        "分岐ノード（if, else if, elif）と default 以外の case ラベルの数。",
-    ),
-    count(
-        "complexity.conditional_count",
-        "Conditional Count",
-        "Number of conditional (ternary) expressions.",
-        "三項演算子の数",
-        "条件式（三項演算子）の数。",
-    ),
-    count(
-        "complexity.loop_count",
-        "Loop Count",
-        "Number of loops.",
-        "ループの数",
-        "ループの数。",
-    ),
-    count(
-        "complexity.return_count",
-        "Return Count",
-        "Number of return statements.",
-        "return の数",
-        "return 文の数。",
-    ),
-    count(
-        "complexity.jump_count",
-        "Jump Count",
-        "Number of jumps: break, continue, goto and throw / raise.",
-        "ジャンプの数",
-        "ジャンプ（break, continue, goto, throw / raise）の数。",
-    ),
-    MetricDefinition {
+    MetricSpec {
+        id: "complexity.branch_count",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "complexity.conditional_count",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "complexity.loop_count",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "complexity.return_count",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "complexity.jump_count",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
         id: "complexity.path_count",
-        name: "Number of Paths",
-        description: "Acyclic execution paths through a function.",
-        definition: "Number of paths through the function when each loop runs zero times or once.",
         scopes: &[Function],
-        input: "Node kinds and tree structure",
-        calculation: "Children in sequence multiply. An if-chain is the sum of its arms, +1 without a final \
-                      else. A loop or ternary is its children's product + 1. Consecutive case labels or catch \
-                      clauses are the sum of their paths + 1. Nested functions count as 1.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Not Nejmeh's NPATH: short-circuit operators and early exits (return, jump) do not \
-                      change the count.",
-        reference: "Nejmeh, B. A. (1988). NPATH: a measure of execution path complexity. CACM 31(2) (related, not identical).",
-        ja: Ja {
-            name: "経路数",
-            description: "関数を通る非循環な実行経路の数。",
-            definition: "各ループを 0 回または 1 回通るとしたときの、関数を通る経路の数。",
-            input: "ノードの種類と木構造",
-            calculation: "並んだ子は掛け算。if の連鎖は各分岐の和（最後の else がなければ +1）。ループと三項演算子は子の積 + 1。連続する case ラベルや catch 節は経路の和 + 1。入れ子関数は 1。",
-            limitations: "Nejmeh の NPATH とは異なる：短絡演算子や早期の脱出（return, jump）は数に影響しない。",
-        },
     },
 ];
 
 impl Calculator for ComplexityCalculator {
-    fn definitions(&self) -> &'static [MetricDefinition] {
-        DEFINITIONS
+    fn specs(&self) -> &'static [MetricSpec] {
+        SPECS
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {

@@ -18,7 +18,7 @@ name = "srcmetrics"
 path = "src/main.rs"
 
 [dependencies]
-srcmetrics = { path = "../srcmetrics", version = "0.1.0" }
+srcmetrics = { path = "../srcmetrics", version = "0.2.0" }
 clap = { version = "4", features = ["derive"] }
 serde_json = "1"
 serde = "1"

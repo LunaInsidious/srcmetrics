@@ -27,7 +27,7 @@
 | `design/SPEC.md` | 開発者 | 目的・スコープ・**設計原則**・内部構成。設計判断に迷ったら必ずここを優先する |
 | `design/adr/` | 開発者 | 設計判断の記録（1 件 1 ファイル） |
 | `design/MEMO.md` | 開発者 | 調査途中の知見・見送った事項 |
-| `docs/` | 利用者 | GitHub Pages のドキュメント（VitePress、英語と日本語）。`docs/metrics/` と `docs/ja/metrics/` はコードから生成 |
+| `docs/` | 利用者 | GitHub Pages のドキュメント（VitePress、英語と日本語）。`docs/metrics/` と `docs/ja/metrics/` はメトリクスの説明（英語・日本語、手で書く） |
 | `README.md` / `README_ja.md` | 利用者 | GitHub・crates.io のトップ。概要とドキュメントサイトへのリンクだけにする |
 
 実装が設計原則と矛盾する場合：
@@ -91,7 +91,8 @@
 - 変更に応じて文書を更新する
   - 内部構成の変更 → `design/SPEC.md`
   - 利用者から見える変更（CLI、出力、API、対応言語、制約）→ `docs/` の英語と日本語の両方。必要なら README も
-  - メトリクスの定義・計算の変更 → 定義の英語と日本語（`ja`）を両方直し、`UPDATE_DOCS=1 cargo test -p srcmetrics --test docs` で `docs/metrics/` と `docs/ja/metrics/` を再生成する。公開済みの版から計算が変わるなら `DEFINITION_VERSION` を上げる
+  - メトリクスの追加・計算の変更 → `docs/metrics/` と `docs/ja/metrics/` の説明を両方直す（テストは ID の有無しか見ないので、説明の中身は自分で確認する）。公開済みの版から計算が変わるなら `DEFINITION_VERSION` を上げる
+- 利用者に影響する変更は `CHANGELOG.md` の Unreleased に書く（破壊的変更は Breaking changes に）
 - 完了前に以下がすべて通ることを確認する
 
 ```sh

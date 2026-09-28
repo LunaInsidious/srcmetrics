@@ -1,162 +1,61 @@
 //! Halstead Metrics (ADR-0008).
 
-use super::{
-    Applicability::*, Calculator, Ja, MetricDefinition, MetricValue, Metrics, ProgramMetrics,
-    Scope::*, per_file,
-};
+use super::{Calculator, MetricSpec, MetricValue, Metrics, ProgramMetrics, Scope::*, per_file};
 use crate::ir::{Program, Token, TokenKind};
 use std::collections::HashSet;
 
 pub struct HalsteadCalculator;
 
-const SCOPES: &[super::Scope] = &[Function, File, Project];
-const INPUT: &str = "Tokens (kind and text)";
-const CLASSIFICATION: &str = "Operators: keyword and operator tokens and opening brackets ( [ {. \
-                              Operands: identifier and literal tokens. Commas, semicolons, closing brackets \
-                              and comments are not counted. Distinct = same token text.";
-const LIMITATIONS: &str = "Keywords, including type keywords such as `int`, are operators. \
-                           A string literal is one operand.";
-const REFERENCE: &str = "Halstead, M. H. (1977). Elements of Software Science. Elsevier.";
-
-const fn halstead(
-    id: &'static str,
-    name: &'static str,
-    description: &'static str,
-    definition: &'static str,
-    unit: &'static str,
-    ja_name: &'static str,
-    ja_definition: &'static str,
-) -> MetricDefinition {
-    MetricDefinition {
-        id,
-        name,
-        description,
-        definition,
-        scopes: SCOPES,
-        input: INPUT,
-        calculation: CLASSIFICATION,
-        unit,
-        applicability: PartiallyLanguageDependent,
-        limitations: LIMITATIONS,
-        reference: REFERENCE,
-        ja: Ja {
-            name: ja_name,
-            description,
-            definition: ja_definition,
-            input: "トークン（種類とテキスト）",
-            calculation: "演算子：keyword と operator のトークン、および開き括弧 ( [ {。被演算子：identifier と \
-                          literal のトークン。カンマ・セミコロン・閉じ括弧・コメントは数えない。種類はトークンの\
-                          テキストが同じものを 1 種類とする。",
-            limitations: "キーワード（`int` などの型のキーワードを含む）は演算子。文字列リテラルは 1 つの被演算子。",
-        },
-    }
-}
-
-static DEFINITIONS: &[MetricDefinition] = &[
-    halstead(
-        "halstead.unique_operators",
-        "Unique Operators",
-        "n1.",
-        "Number of distinct operators.",
-        "count",
-        "演算子の種類数",
-        "演算子の種類の数。",
-    ),
-    halstead(
-        "halstead.unique_operands",
-        "Unique Operands",
-        "n2.",
-        "Number of distinct operands.",
-        "count",
-        "被演算子の種類数",
-        "被演算子の種類の数。",
-    ),
-    halstead(
-        "halstead.total_operators",
-        "Total Operators",
-        "N1.",
-        "Number of operator occurrences.",
-        "count",
-        "演算子の総数",
-        "演算子の出現回数。",
-    ),
-    halstead(
-        "halstead.total_operands",
-        "Total Operands",
-        "N2.",
-        "Number of operand occurrences.",
-        "count",
-        "被演算子の総数",
-        "被演算子の出現回数。",
-    ),
-    halstead(
-        "halstead.vocabulary",
-        "Vocabulary",
-        "n.",
-        "n = n1 + n2.",
-        "count",
-        "語彙数",
-        "n = n1 + n2。",
-    ),
-    halstead(
-        "halstead.length",
-        "Program Length",
-        "N.",
-        "N = N1 + N2.",
-        "count",
-        "プログラム長",
-        "N = N1 + N2。",
-    ),
-    halstead(
-        "halstead.volume",
-        "Volume",
-        "V.",
-        "V = N * log2(n); not_applicable when n = 0.",
-        "bits",
-        "Volume",
-        "V = N * log2(n)。n = 0 なら not_applicable。",
-    ),
-    halstead(
-        "halstead.difficulty",
-        "Difficulty",
-        "D.",
-        "D = (n1 / 2) * (N2 / n2); not_applicable when n2 = 0.",
-        "ratio",
-        "Difficulty",
-        "D = (n1 / 2) * (N2 / n2)。n2 = 0 なら not_applicable。",
-    ),
-    halstead(
-        "halstead.effort",
-        "Effort",
-        "E.",
-        "E = D * V.",
-        "count",
-        "Effort",
-        "E = D * V。",
-    ),
-    halstead(
-        "halstead.time",
-        "Estimated Program Time",
-        "T.",
-        "T = E / 18.",
-        "seconds",
-        "推定プログラミング時間",
-        "T = E / 18。",
-    ),
-    halstead(
-        "halstead.bugs",
-        "Estimated Bugs",
-        "B.",
-        "B = V / 3000.",
-        "count",
-        "推定バグ数",
-        "B = V / 3000。",
-    ),
+static SPECS: &[MetricSpec] = &[
+    MetricSpec {
+        id: "halstead.unique_operators",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.unique_operands",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.total_operators",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.total_operands",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.vocabulary",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.length",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.volume",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.difficulty",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.effort",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.time",
+        scopes: &[Function, File, Project],
+    },
+    MetricSpec {
+        id: "halstead.bugs",
+        scopes: &[Function, File, Project],
+    },
 ];
 
 impl Calculator for HalsteadCalculator {
-    fn definitions(&self) -> &'static [MetricDefinition] {
-        DEFINITIONS
+    fn specs(&self) -> &'static [MetricSpec] {
+        SPECS
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {

@@ -53,16 +53,15 @@ impl Drop for Server {
 }
 
 #[test]
-fn serves_ui_metrics_and_analysis() {
+fn serves_ui_and_analysis() {
     let server = Server::start();
 
     let (status, page) = server.request("GET", "/", "");
     assert_eq!(status, 200);
     assert!(page.contains("<textarea"));
 
-    let (status, body) = server.request("GET", "/api/metrics", "");
-    assert_eq!(status, 200);
-    assert!(body.contains("\"complexity.cyclomatic\""));
+    // Metric definitions are documentation, not an API (ADR-0026).
+    assert_eq!(server.request("GET", "/api/metrics", "").0, 404);
 
     let request = r#"{"filename": "a.py", "source": "def f(x):\n    return x\n"}"#;
     let (status, body) = server.request("POST", "/api/analyze", request);

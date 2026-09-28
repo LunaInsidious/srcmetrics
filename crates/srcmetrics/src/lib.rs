@@ -2,8 +2,9 @@
 //!
 //! `srcmetrics` parses source code with [tree-sitter](https://tree-sitter.github.io/), converts it
 //! to a small language-independent intermediate representation ([`ir`]), and computes metrics
-//! from that representation only ([`metrics`]). Every metric is reported separately, with its
-//! definition ([`metrics::definitions`]); none are combined into a single readability score.
+//! from that representation only ([`metrics`]). Every metric is reported separately under its id
+//! ([`metrics::specs`]); none are combined into a single readability score. What each metric means
+//! is documented at <https://lunainsidious.github.io/srcmetrics/metrics/>.
 //!
 //! Supported languages: C, C++, Go, Java, JavaScript (JSX), Python, Rust, TypeScript (TSX).
 //!

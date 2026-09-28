@@ -1,10 +1,8 @@
-<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->
-
 # Metrics
 
 Every metric is reported separately under its id, at the scopes listed below. A value that cannot be computed is `null`, with the reason in `unavailable`; it is never 0.
 
-Metric definition version: `0.1.0` (recorded in every analysis result).
+When a calculation changes, the metric definition version changes; every analysis result records the version it was computed with (`run.metric_definition_version`).
 
 | Metric | Name | Scopes | Unit |
 |---|---|---|---|

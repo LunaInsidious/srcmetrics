@@ -8,7 +8,6 @@ srcmetrics <COMMAND>
   report    Self-contained HTML report
   model     Experimental readability model (train / predict)
   serve     HTTP API and web UI
-  metrics   Metric definitions
 ```
 
 Errors exit with status 1 and a message saying what to do next.
@@ -68,12 +67,3 @@ srcmetrics serve [--bind 127.0.0.1] [--port 8080]
 
 See [HTTP API](./http-api).
 
-## metrics
-
-```sh
-srcmetrics metrics [--format json|markdown]
-```
-
-Prints every metric definition: id, name, description, definition, scopes, input, calculation,
-unit, language applicability, limitations and reference. The same content is in the
-[metric reference](/metrics/).

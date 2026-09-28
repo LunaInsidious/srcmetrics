@@ -10,7 +10,6 @@ use. `--port 0` picks a free port; the address is printed on stderr.
 | Endpoint | |
 |---|---|
 | `GET /` | Web UI: paste code, give it a file name and see its metrics |
-| `GET /api/metrics` | Metric definitions (JSON) |
 | `POST /api/analyze` | Analyze one file |
 
 ## `POST /api/analyze`

@@ -1,5 +1,3 @@
-<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->
-
 # Halstead
 
 ## 演算子の種類数 {#halstead-unique-operators}

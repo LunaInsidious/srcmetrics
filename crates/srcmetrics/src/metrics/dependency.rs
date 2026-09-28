@@ -1,112 +1,33 @@
 //! Dependency Metrics (ADR-0012).
 
-use super::{
-    Applicability::*, Calculator, FileMetrics, Ja, MetricDefinition, Metrics, ProgramMetrics,
-    Scope::*,
-};
+use super::{Calculator, FileMetrics, MetricSpec, Metrics, ProgramMetrics, Scope::*};
 use crate::ir::{NodeKind, Program};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub struct DependencyCalculator;
 
-const NAME_BASED: &str = "Calls are resolved by callee name only (no types, scopes or imports).";
-
-static DEFINITIONS: &[MetricDefinition] = &[
-    MetricDefinition {
+static SPECS: &[MetricSpec] = &[
+    MetricSpec {
         id: "dependency.fan_out",
-        name: "Fan-out",
-        description: "Number of distinct functions a function calls.",
-        definition: "Distinct callee names of the call nodes in the function.",
         scopes: &[Function],
-        input: "Call nodes and their callee labels",
-        calculation: "Excludes calls made by nested functions. Includes callees defined outside the project. \
-                      Calls without a callee name (e.g. `f()()`) are not counted.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: NAME_BASED,
-        reference: "Henry, S. & Kafura, D. (1981). Software Structure Metrics Based on Information Flow. IEEE TSE SE-7(5).",
-        ja: Ja {
-            name: "Fan-out",
-            description: "関数が呼び出す関数の種類の数。",
-            definition: "関数内の呼び出しノードの、呼び出し先の名前の種類の数。",
-            input: "呼び出しノードと呼び出し先のラベル",
-            calculation: "入れ子関数による呼び出しは除く。プロジェクト外で定義された呼び出し先も含む。呼び出し先の名前がない呼び出し（例：`f()()`）は数えない。",
-            limitations: "呼び出しは呼び出し先の名前だけで解決する（型・スコープ・import は見ない）。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "dependency.fan_in",
-        name: "Fan-in",
-        description: "Number of distinct project functions that call a function.",
-        definition: "Distinct functions in the project having a call whose callee name is this function's name.",
         scopes: &[Function],
-        input: "Call nodes and their callee labels, function names",
-        calculation: "Functions with the same name share the value. Anonymous functions have 0.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Name-based: same-named methods of different classes are not distinguished, which \
-                      overestimates fan-in.",
-        reference: "Henry, S. & Kafura, D. (1981). Software Structure Metrics Based on Information Flow. IEEE TSE SE-7(5).",
-        ja: Ja {
-            name: "Fan-in",
-            description: "関数を呼び出しているプロジェクト内の関数の数。",
-            definition: "呼び出し先の名前がこの関数の名前と同じ呼び出しを持つ、プロジェクト内の関数の数。",
-            input: "呼び出しノードと呼び出し先のラベル、関数名",
-            calculation: "同じ名前の関数は同じ値になる。無名関数は 0。",
-            limitations: "名前だけで解決するため、別のクラスの同名メソッドを区別できず、fan-in を多めに数える。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "dependency.call_depth",
-        name: "Call Depth",
-        description: "Longest chain of calls through project functions.",
-        definition: "Longest path, in edges, from the function's name in the project call graph of \
-                     function names, with strongly connected components (recursion) collapsed.",
         scopes: &[Function],
-        input: "Call nodes and their callee labels, function names",
-        calculation: "Nodes are the names of project functions; a name calls the union of what its \
-                      functions call. Edges inside a strongly connected component are not counted. An \
-                      anonymous function has 1 + the deepest name it calls. 0 when no project function is called.",
-        unit: "calls",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Name-based: same-named functions share one value.",
-        reference: "",
-        ja: Ja {
-            name: "呼び出しの深さ",
-            description: "プロジェクト内の関数をたどる最長の呼び出しの連鎖。",
-            definition: "関数名を頂点とするプロジェクトの呼び出しグラフで、強連結成分（再帰）をまとめたうえでの、その関数の名前からの最長経路の辺の数。",
-            input: "呼び出しノードと呼び出し先のラベル、関数名",
-            calculation: "頂点はプロジェクト内の関数の名前で、ある名前はその名前の全関数が呼ぶものを呼ぶ。強連結成分の中の辺は数えない。無名関数は 1 + 呼び出している名前の最大の深さ。プロジェクト内の関数を呼ばなければ 0。",
-            limitations: "名前だけで解決するため、同じ名前の関数は同じ値になる。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "dependency.dependency_count",
-        name: "Dependency Count",
-        description: "Number of import / include declarations.",
-        definition: "Nodes of kind import.",
         scopes: &[File, Project],
-        input: "Import nodes",
-        calculation: "Each imported item that the grammar represents as a separate declaration counts once \
-                      (e.g. each Go import spec). Project: sum.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Import granularity differs between languages (Python `from a import b, c` is one import).",
-        reference: "",
-        ja: Ja {
-            name: "依存の数",
-            description: "import / include 宣言の数。",
-            definition: "import の種類のノード。",
-            input: "import ノード",
-            calculation: "文法が別々の宣言として表す import の項目ごとに 1 と数える（例：Go の import spec ごと）。プロジェクト：合計。",
-            limitations: "import の粒度は言語によって異なる（Python の `from a import b, c` は 1 つの import）。",
-        },
     },
 ];
 
 impl Calculator for DependencyCalculator {
-    fn definitions(&self) -> &'static [MetricDefinition] {
-        DEFINITIONS
+    fn specs(&self) -> &'static [MetricSpec] {
+        SPECS
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {

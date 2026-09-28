@@ -4,9 +4,9 @@ mod serve;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use srcmetrics::analyze::analyze;
+use srcmetrics::model;
 use srcmetrics::result::{AnalysisResult, FileResult};
 use srcmetrics::stats::{self, UnitScope};
-use srcmetrics::{metrics, model};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -67,11 +67,6 @@ enum Command {
         #[arg(long, default_value_t = 8080)]
         port: u16,
     },
-    /// List the metric definitions.
-    Metrics {
-        #[arg(long, value_enum, default_value_t = DefinitionFormat::Json)]
-        format: DefinitionFormat,
-    },
 }
 
 #[derive(Subcommand)]
@@ -124,12 +119,6 @@ impl From<Unit> for UnitScope {
     }
 }
 
-#[derive(Clone, Copy, ValueEnum)]
-enum DefinitionFormat {
-    Json,
-    Markdown,
-}
-
 fn main() -> ExitCode {
     match run(Cli::parse().command) {
         Ok(()) => ExitCode::SUCCESS,
@@ -169,14 +158,6 @@ fn run(command: Command) -> Result<(), String> {
             write(output, &srcmetrics::report::to_html(&result))
         }
         Command::Serve { bind, port } => serve::serve(std::net::SocketAddr::new(bind, port)),
-        Command::Metrics { format } => {
-            let definitions = metrics::definitions();
-            let text = match format {
-                DefinitionFormat::Json => to_json(&definitions)?,
-                DefinitionFormat::Markdown => metrics::to_markdown(&definitions),
-            };
-            write(None, &text)
-        }
     }
 }
 

@@ -3,87 +3,29 @@
 //! Comment LOC and Comment Ratio are provided by the Size calculator (`size.comment_loc`,
 //! `size.comment_ratio`).
 
-use super::{
-    Applicability::*, Calculator, Ja, MetricDefinition, MetricValue, Metrics, ProgramMetrics,
-    Scope::*, per_file,
-};
+use super::{Calculator, MetricSpec, MetricValue, Metrics, ProgramMetrics, Scope::*, per_file};
 use crate::ir::{File, Program};
 
 pub struct DocumentationCalculator;
 
-const DOCUMENTATION: &str = "A function is documented when a comment block directly precedes it (above its \
-                             decorators / attributes, with no blank line in between and not a trailing \
-                             comment), or, where the language has docstrings, when its body starts with one.";
-
-static DEFINITIONS: &[MetricDefinition] = &[
-    MetricDefinition {
+static SPECS: &[MetricSpec] = &[
+    MetricSpec {
         id: "documentation.doc_loc",
-        name: "Documentation LOC",
-        description: "Lines of a function's documentation.",
-        definition: DOCUMENTATION,
         scopes: &[Function],
-        input: "Function documentation range",
-        calculation: "Lines spanned by the documentation; 0 when the function is undocumented.",
-        unit: "lines",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Any comment style counts (not only `/**` or `///`).",
-        reference: "",
-        ja: Ja {
-            name: "ドキュメント行数",
-            description: "関数のドキュメントの行数。",
-            definition: "関数の直前にコメントのまとまりがある（デコレータ・属性の上でもよい。間に空行がなく、行末コメントではない）か、docstring のある言語で本体が docstring で始まるとき、その関数はドキュメントがあるとする。",
-            input: "関数のドキュメントの範囲",
-            calculation: "ドキュメントがまたがる行数。ドキュメントがなければ 0。",
-            limitations: "どのコメントの書き方でもよい（`/**` や `///` に限らない）。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "documentation.documented_function_count",
-        name: "Documentation Count",
-        description: "Number of documented functions.",
-        definition: DOCUMENTATION,
         scopes: &[File, Project],
-        input: "Function documentation range",
-        calculation: "Functions with documentation. Project: sum.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Any comment style counts (not only `/**` or `///`).",
-        reference: "",
-        ja: Ja {
-            name: "ドキュメントのある関数の数",
-            description: "ドキュメントのある関数の数。",
-            definition: "関数の直前にコメントのまとまりがある（デコレータ・属性の上でもよい。間に空行がなく、行末コメントではない）か、docstring のある言語で本体が docstring で始まるとき、その関数はドキュメントがあるとする。",
-            input: "関数のドキュメントの範囲",
-            calculation: "ドキュメントのある関数の数。プロジェクト：合計。",
-            limitations: "どのコメントの書き方でもよい（`/**` や `///` に限らない）。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "documentation.documentation_ratio",
-        name: "Documentation Ratio",
-        description: "Share of documented functions.",
-        definition: "Documentation Count / Function Count.",
         scopes: &[File, Project],
-        input: "Function documentation range",
-        calculation: "not_applicable when there are no functions.",
-        unit: "ratio",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Any comment style counts (not only `/**` or `///`).",
-        reference: "",
-        ja: Ja {
-            name: "ドキュメント率",
-            description: "ドキュメントのある関数の割合。",
-            definition: "ドキュメントのある関数の数 / 関数の数。",
-            input: "関数のドキュメントの範囲",
-            calculation: "関数がなければ not_applicable。",
-            limitations: "どのコメントの書き方でもよい（`/**` や `///` に限らない）。",
-        },
     },
 ];
 
 impl Calculator for DocumentationCalculator {
-    fn definitions(&self) -> &'static [MetricDefinition] {
-        DEFINITIONS
+    fn specs(&self) -> &'static [MetricSpec] {
+        SPECS
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {

@@ -28,16 +28,16 @@ fn equivalence_program() -> Program {
 #[test]
 fn metric_ids_are_unique() {
     let mut seen = HashSet::new();
-    for d in metrics::definitions() {
+    for d in metrics::specs() {
         assert!(seen.insert(d.id), "duplicate metric id {}", d.id);
     }
 }
 
 #[test]
-fn emitted_metrics_match_their_definitions_scopes() {
+fn emitted_metrics_match_the_registered_scopes() {
     let result = metrics::compute(&equivalence_program());
     let check = |scope: Scope, emitted: &Metrics| {
-        let expected: HashSet<_> = metrics::definitions()
+        let expected: HashSet<_> = metrics::specs()
             .into_iter()
             .filter(|d| d.scopes.contains(&scope))
             .map(|d| d.id)
@@ -154,27 +154,4 @@ fn long_else_if_ladders_are_handled_in_linear_time() {
         "took {:?}",
         started.elapsed()
     );
-}
-
-/// Every English text of a definition has a Japanese counterpart (ADR-0025).
-#[test]
-fn every_definition_is_translated_into_japanese() {
-    for d in metrics::definitions() {
-        let pairs = [
-            ("name", d.name, d.ja.name),
-            ("description", d.description, d.ja.description),
-            ("definition", d.definition, d.ja.definition),
-            ("input", d.input, d.ja.input),
-            ("calculation", d.calculation, d.ja.calculation),
-            ("limitations", d.limitations, d.ja.limitations),
-        ];
-        for (field, en, ja) in pairs {
-            assert_eq!(
-                en.is_empty(),
-                ja.is_empty(),
-                "{}: ja.{field} does not match the English text",
-                d.id
-            );
-        }
-    }
 }

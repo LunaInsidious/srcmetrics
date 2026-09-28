@@ -3,128 +3,37 @@
 //! Function Length, Statement Count, Complexity, Maximum Nesting Depth and Return Count are
 //! provided at function scope by the Size, Complexity and Nesting calculators.
 
-use super::{
-    Applicability::*, Calculator, Ja, MetricDefinition, MetricValue, Metrics, ProgramMetrics,
-    Scope::*, per_file,
-};
+use super::{Calculator, MetricSpec, MetricValue, Metrics, ProgramMetrics, Scope::*, per_file};
 use crate::ir::{File, Function, Node, NodeKind, Program};
 
 pub struct FunctionCalculator;
 
-static DEFINITIONS: &[MetricDefinition] = &[
-    MetricDefinition {
+static SPECS: &[MetricSpec] = &[
+    MetricSpec {
         id: "function.parameter_count",
-        name: "Parameter Count",
-        description: "Number of declared parameters.",
-        definition: "Parameters of the function in the IR.",
         scopes: &[Function],
-        input: "Function parameters",
-        calculation: "Variadic parameters (e.g. `*args`) count as one. Separators such as Python `*` and `/` \
-                      and C `(void)` are not parameters.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Explicit receivers (Python `self`) count; implicit ones (`this`) do not.",
-        reference: "",
-        ja: Ja {
-            name: "引数の数",
-            description: "宣言された引数の数。",
-            definition: "IR 上の関数の引数。",
-            input: "関数の引数",
-            calculation: "可変長引数（例：`*args`）は 1 つと数える。Python の `*` や `/`、C の `(void)` のような区切りは引数ではない。",
-            limitations: "明示的な受け手（Python の `self`）は数え、暗黙の受け手（`this`）は数えない。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "function.avg_parameter_count",
-        name: "Average Parameter Count",
-        description: "Mean Parameter Count over functions.",
-        definition: "Mean of function.parameter_count.",
         scopes: &[File, Project],
-        input: "Function parameters",
-        calculation: "not_applicable when there are no functions.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "See function.parameter_count.",
-        reference: "",
-        ja: Ja {
-            name: "平均引数数",
-            description: "関数の引数の数の平均。",
-            definition: "function.parameter_count の平均。",
-            input: "関数の引数",
-            calculation: "関数がなければ not_applicable。",
-            limitations: "function.parameter_count を参照。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "function.max_parameter_count",
-        name: "Maximum Parameter Count",
-        description: "Largest Parameter Count over functions.",
-        definition: "Maximum of function.parameter_count.",
         scopes: &[File, Project],
-        input: "Function parameters",
-        calculation: "not_applicable when there are no functions.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "See function.parameter_count.",
-        reference: "",
-        ja: Ja {
-            name: "最大引数数",
-            description: "関数の引数の数の最大値。",
-            definition: "function.parameter_count の最大値。",
-            input: "関数の引数",
-            calculation: "関数がなければ not_applicable。",
-            limitations: "function.parameter_count を参照。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "function.expression_count",
-        name: "Expression Count",
-        description: "Number of expressions, including sub-expressions.",
-        definition: "Nodes of kind expression, call, assignment, binary, logical, conditional or unary.",
         scopes: &[Function, File, Project],
-        input: "Node kinds",
-        calculation: "Function: excluding nested functions. File: the whole file. Project: sum. \
-                      Identifiers and literals are not expressions on their own.",
-        unit: "count",
-        applicability: PartiallyLanguageDependent,
-        limitations: "Expression forms not listed in a language Mapping (e.g. lambdas' bodies are nested \
-                      functions; unmapped expression types are `other`) are not counted.",
-        reference: "",
-        ja: Ja {
-            name: "式の数",
-            description: "部分式を含む式の数。",
-            definition: "expression, call, assignment, binary, logical, conditional, unary の種類のノード。",
-            input: "ノードの種類",
-            calculation: "関数：入れ子関数を除く。ファイル：ファイル全体。プロジェクト：合計。識別子とリテラルは単独では式に数えない。",
-            limitations: "言語の Mapping に載っていない式の形（例：ラムダの本体は入れ子関数。対応付けのない式は `other`）は数えない。",
-        },
     },
-    MetricDefinition {
+    MetricSpec {
         id: "function.call_count",
-        name: "Call Count",
-        description: "Number of call sites.",
-        definition: "Nodes of kind call (function calls and constructor calls).",
         scopes: &[Function, File, Project],
-        input: "Node kinds",
-        calculation: "Function: excluding nested functions. File: the whole file. Project: sum.",
-        unit: "count",
-        applicability: LanguageIndependent,
-        limitations: "",
-        reference: "",
-        ja: Ja {
-            name: "呼び出しの数",
-            description: "呼び出し箇所の数。",
-            definition: "call の種類のノード（関数呼び出しとコンストラクタ呼び出し）。",
-            input: "ノードの種類",
-            calculation: "関数：入れ子関数を除く。ファイル：ファイル全体。プロジェクト：合計。",
-            limitations: "",
-        },
     },
 ];
 
 impl Calculator for FunctionCalculator {
-    fn definitions(&self) -> &'static [MetricDefinition] {
-        DEFINITIONS
+    fn specs(&self) -> &'static [MetricSpec] {
+        SPECS
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {

@@ -2,7 +2,7 @@
 
 本書は srcmetrics の目的・設計原則と、現在の実装の内部構成を記述する。
 利用方法（CLI、出力形式、ライブラリ API、HTTP API）は利用者向けドキュメント（`docs/`、GitHub Pages）を、
-各メトリクスの定義は `docs/metrics/`（コードから生成）を、設計判断の根拠は [ADR](adr/README.md) を参照。
+各メトリクスの意味は `docs/metrics/` を、設計判断の根拠は [ADR](adr/README.md) を参照。
 
 ## 0. 目的とスコープ
 
@@ -36,7 +36,7 @@ crates/srcmetrics/          コアライブラリ（同期・ネットワーク�
   src/ir.rs                 Common IR
   src/error.rs              解析エラー
   src/lang/                 Language Adapter（tree-sitter 汎用変換器 + 言語別 Mapping）
-  src/metrics/              Metric Engine（Calculator 群、定義レジストリ、定義の Markdown 生成）
+  src/metrics/              Metric Engine（Calculator 群、メトリクスの登録簿（ID とスコープ））
   src/analyze.rs            解析パイプライン（パス走査 → IR → メトリクス → 結果）
   src/result.rs             解析結果の型（JSON 形式）
   src/csv.rs                CSV 出力
@@ -45,7 +45,7 @@ crates/srcmetrics/          コアライブラリ（同期・ネットワーク�
   src/report.rs             自己完結 HTML レポート
 crates/srcmetrics-cli/      CLI（clap）と HTTP サーバ（axum。src/serve.rs, src/ui.html）
 tests/fixtures/             言語別フィクスチャ
-docs/                       利用者向けドキュメント（VitePress、GitHub Pages）。docs/metrics/ はコードから生成
+docs/                       利用者向けドキュメント（VitePress、GitHub Pages）。docs/metrics/ にメトリクスの説明
 design/                     開発者向け文書（本書、ADR、MEMO）
 ```
 
@@ -126,7 +126,7 @@ Metric Engine は変更しない。
 - `Calculator { definitions(), compute(&Program) -> ProgramMetrics }`。各 Calculator は独立しており、互いの結果を参照しない。
 - `metrics::compute` が全 Calculator を実行し、スコープごとの `Metrics`（id → `MetricValue`、id 順）を併合する。
 - `MetricValue = Available(f64) | NotApplicable | Unsupported | Error(String)`（ADR-0005）。
-- 定義は各 Calculator の `DEFINITIONS` に、id・名前・説明・定義・スコープ・入力・計算方法・単位・言語依存性・制約・参考文献を記述する。日本語の各欄は同じ定義の `ja` に書く（ADR-0025。英語に値がある欄の日本語が空ならテストが失敗する）。利用者向けのメトリクス定義ページ（英語 `docs/metrics/`、日本語 `docs/ja/metrics/`）はそこから生成する（`tests/docs.rs` で同期を検査）。
+- 各 Calculator は、出力するメトリクスの ID とスコープを `SPECS`（`MetricSpec`）に登録する。出力がこれと一致することを `tests/engine.rs` で検査する。メトリクスの意味・計算方法・制約は利用者向けドキュメント（英語 `docs/metrics/`、日本語 `docs/ja/metrics/`）に手で書き、コードには持たない（ADR-0026）。全 ID が両言語のページに載っていることを `tests/docs.rs` で検査する。
 - 定義や計算方法を変えたら `DEFINITION_VERSION` を上げる。初回リリースまでの開発中は `0.1.0` のまま（公開済みの解析結果がないため）。
 
 ### 実装済み Calculator
@@ -161,9 +161,9 @@ Metric Engine は変更しない。
 
 ### メトリクスの追加手順
 
-1. `src/metrics/<name>.rs` に Calculator と `DEFINITIONS` を書き、`calculators()` に登録
+1. `src/metrics/<name>.rs` に Calculator と `SPECS` を書き、`calculators()` に登録
 2. 手組み IR（`ir::builder`）で単体テストを書く
-3. `ja` に日本語の定義を書き、`UPDATE_DOCS=1 cargo test -p srcmetrics --test docs` で `docs/metrics/` と `docs/ja/metrics/` を再生成
+3. `docs/metrics/` と `docs/ja/metrics/` に説明を書く（各メトリクスの節は「`` `ID` — 説明 ``」の行で始める）
 
 ## 7. 出力・CLI・HTTP API の実装上の決まり
 
@@ -192,7 +192,7 @@ Metric Engine は変更しない。
 | `src/**` の `#[cfg(test)]` | IR 補助関数、Calculator 単体（手組み IR） |
 | `tests/adapter.rs` | 言語別の IR 変換 |
 | `tests/engine.rs` | 定義と出力の整合、言語横断の等価性、Metric Engine の言語非依存性 |
-| `tests/docs.rs` | `docs/metrics/`, `docs/ja/metrics/`（メトリクス定義ページ）の同期 |
+| `tests/docs.rs` | 全メトリクス ID が `docs/metrics/`, `docs/ja/metrics/` に載っていること |
 | `tests/analyze.rs` | ディレクトリ解析、エラーファイルの記録、run メタデータ、JSON 往復 |
 | `tests/model.rs` | ラベルの照合、学習、予測 |
 | `crates/srcmetrics-cli/tests/cli.rs` | CLI の出力と終了コード |

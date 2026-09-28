@@ -7,7 +7,6 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use srcmetrics::analyze::analyze_source;
-use srcmetrics::metrics;
 use std::net::SocketAddr;
 
 const UI: &str = include_str!("ui.html");
@@ -30,10 +29,6 @@ pub fn serve(address: SocketAddr) -> Result<(), String> {
         eprintln!("listening on http://{bound}");
         let app = Router::new()
             .route("/", get(|| async { Html(UI) }))
-            .route(
-                "/api/metrics",
-                get(|| async { Json(metrics::definitions()) }),
-            )
             .route("/api/analyze", post(analyze));
         axum::serve(listener, app)
             .await

@@ -10,15 +10,13 @@ mod documentation;
 mod duplication;
 mod function;
 mod halstead;
-mod markdown;
 mod nesting;
 mod size;
 
 use crate::ir::{File, Function, Program};
 use std::collections::BTreeMap;
 
-pub use definition::{Applicability, DEFINITION_VERSION, Ja, MetricDefinition, Scope};
-pub use markdown::{Lang, reference_pages, to_markdown};
+pub use definition::{DEFINITION_VERSION, MetricSpec, Scope};
 
 /// A metric value, or the reason it has none (ADR-0005). Never conflates "0" with "not computed".
 #[derive(Debug, Clone, PartialEq)]
@@ -113,7 +111,8 @@ impl ProgramMetrics {
 
 /// An independent metric calculator (design principle P4).
 pub trait Calculator {
-    fn definitions(&self) -> &'static [MetricDefinition];
+    /// The metrics this calculator reports.
+    fn specs(&self) -> &'static [MetricSpec];
     fn compute(&self, program: &Program) -> ProgramMetrics;
 }
 
@@ -160,13 +159,13 @@ pub fn calculators() -> Vec<Box<dyn Calculator>> {
     ]
 }
 
-/// Definitions of all standard metrics followed by the derived ones.
-pub fn definitions() -> Vec<&'static MetricDefinition> {
+/// Every metric: the standard ones in calculator order, then the derived ones.
+pub fn specs() -> Vec<&'static MetricSpec> {
     let standard: Vec<_> = calculators()
         .iter()
-        .flat_map(|c| c.definitions().iter())
+        .flat_map(|c| c.specs().iter())
         .collect();
-    standard.into_iter().chain(derived::definitions()).collect()
+    standard.into_iter().chain(derived::specs()).collect()
 }
 
 /// Runs every calculator over the program, then adds the derived metrics to every scope (ADR-0015).

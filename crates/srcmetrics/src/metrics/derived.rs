@@ -1,120 +1,64 @@
 //! Derived metrics (ADR-0015, design principle P8): computed from standard metric values only.
 
-use super::{Applicability::*, Ja, MetricDefinition, MetricValue, Metrics, Scope};
+use super::{MetricSpec, MetricValue, Metrics, Scope};
 
-/// A derived metric: its definition and how to compute it from the standard metrics of a scope.
+/// A derived metric: its id and scopes, and how to compute it from the standard metrics of a scope.
+/// Formulas are documented in docs/metrics/ (ADR-0026).
 struct Derivation {
-    definition: MetricDefinition,
+    spec: MetricSpec,
     compute: fn(&Metrics) -> MetricValue,
-}
-
-const FILE_AND_PROJECT: &[Scope] = &[Scope::File, Scope::Project];
-
-const fn ratio(
-    id: &'static str,
-    name: &'static str,
-    definition: &'static str,
-    input: &'static str,
-    ja_name: &'static str,
-    compute: fn(&Metrics) -> MetricValue,
-) -> Derivation {
-    Derivation {
-        definition: MetricDefinition {
-            id,
-            name,
-            description: definition,
-            definition,
-            scopes: FILE_AND_PROJECT,
-            input,
-            calculation: "not_applicable when the denominator is 0 or an input is unavailable.",
-            unit: "ratio",
-            applicability: PartiallyLanguageDependent,
-            limitations: "A normalization: its choice of denominator affects comparisons.",
-            reference: "",
-            ja: Ja {
-                name: ja_name,
-                description: definition,
-                definition,
-                input,
-                calculation: "分母が 0 か、入力が得られない場合は not_applicable。",
-                limitations: "正規化の一種で、分母の選び方が比較の結果に影響する。",
-            },
-        },
-        compute,
-    }
 }
 
 static DERIVATIONS: &[Derivation] = &[
     Derivation {
-        definition: MetricDefinition {
+        spec: MetricSpec {
             id: "maintainability.index",
-            name: "Maintainability Index",
-            description: "Composite maintainability estimate (original, unbounded formula).",
-            definition: "MI = 171 - 5.2 * ln(V) - 0.23 * CC - 16.2 * ln(SLOC).",
             scopes: &[Scope::Function, Scope::File],
-            input: "halstead.volume (V), complexity.cyclomatic (CC), size.sloc (SLOC)",
-            calculation: "not_applicable unless V > 0 and SLOC > 0. Not rescaled to 0-100.",
-            unit: "index",
-            applicability: PartiallyLanguageDependent,
-            limitations: "Inherits the limitations of its inputs; the coefficients were fitted on 1990s code.",
-            reference: "Oman, P. & Hagemeister, J. (1992). Metrics for assessing a software system's maintainability. ICSM.",
-            ja: Ja {
-                name: "Maintainability Index",
-                description: "保守性の合成指標（上限のない元の式）。",
-                definition: "MI = 171 - 5.2 * ln(V) - 0.23 * CC - 16.2 * ln(SLOC)。",
-                input: "halstead.volume (V), complexity.cyclomatic (CC), size.sloc (SLOC)",
-                calculation: "V > 0 かつ SLOC > 0 のときだけ計算する（それ以外は not_applicable）。0〜100 に換算しない。",
-                limitations: "入力のメトリクスの制約を受け継ぐ。係数は 1990 年代のコードで求められたもの。",
-            },
         },
         compute: maintainability_index,
     },
-    ratio(
-        "derived.cyclomatic_per_function",
-        "Cyclomatic Complexity per Function",
-        "complexity.cyclomatic / size.function_count.",
-        "complexity.cyclomatic, size.function_count",
-        "関数あたりの Cyclomatic Complexity",
-        |m| divide(m, "complexity.cyclomatic", "size.function_count"),
-    ),
-    ratio(
-        "derived.tokens_per_loc",
-        "Tokens per LOC",
-        "size.token_count / size.loc.",
-        "size.token_count, size.loc",
-        "LOC あたりのトークン数",
-        |m| divide(m, "size.token_count", "size.loc"),
-    ),
-    ratio(
-        "derived.statements_per_function",
-        "Statements per Function",
-        "size.statement_count / size.function_count.",
-        "size.statement_count, size.function_count",
-        "関数あたりの文の数",
-        |m| divide(m, "size.statement_count", "size.function_count"),
-    ),
-    ratio(
-        "derived.duplicate_tokens_per_sloc",
-        "Duplicate Tokens per SLOC",
-        "duplication.duplicate_token_count / size.sloc.",
-        "duplication.duplicate_token_count, size.sloc",
-        "SLOC あたりの重複トークン数",
-        |m| divide(m, "duplication.duplicate_token_count", "size.sloc"),
-    ),
+    Derivation {
+        spec: MetricSpec {
+            id: "derived.cyclomatic_per_function",
+            scopes: &[Scope::File, Scope::Project],
+        },
+        compute: |m| divide(m, "complexity.cyclomatic", "size.function_count"),
+    },
+    Derivation {
+        spec: MetricSpec {
+            id: "derived.tokens_per_loc",
+            scopes: &[Scope::File, Scope::Project],
+        },
+        compute: |m| divide(m, "size.token_count", "size.loc"),
+    },
+    Derivation {
+        spec: MetricSpec {
+            id: "derived.statements_per_function",
+            scopes: &[Scope::File, Scope::Project],
+        },
+        compute: |m| divide(m, "size.statement_count", "size.function_count"),
+    },
+    Derivation {
+        spec: MetricSpec {
+            id: "derived.duplicate_tokens_per_sloc",
+            scopes: &[Scope::File, Scope::Project],
+        },
+        compute: |m| divide(m, "duplication.duplicate_token_count", "size.sloc"),
+    },
 ];
 
-pub(super) fn definitions() -> impl Iterator<Item = &'static MetricDefinition> {
-    DERIVATIONS.iter().map(|d| &d.definition)
+pub(super) fn specs() -> impl Iterator<Item = &'static MetricSpec> {
+    DERIVATIONS.iter().map(|d| &d.spec)
 }
 
 /// Adds the derived metrics defined for `scope` to `metrics`.
 pub(super) fn derive(scope: Scope, metrics: &mut Metrics) {
     for d in DERIVATIONS
         .iter()
-        .filter(|d| d.definition.scopes.contains(&scope))
+        .filter(|d| d.spec.scopes.contains(&scope))
     {
         let value = (d.compute)(metrics);
-        metrics.insert(d.definition.id, value);
+        metrics.insert(d.spec.id, value);
     }
 }
 

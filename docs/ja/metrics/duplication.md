@@ -1,5 +1,3 @@
-<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->
-
 # 重複
 
 ## 重複ブロック数 {#duplication-duplicate-block-count}

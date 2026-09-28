@@ -86,5 +86,5 @@ function,src/a.py,python,greet,1,4,ok,,…
 file,src/broken.c,c,,,,error,"src/broken.c:1:12: parse error: …",…
 ```
 
-Metric columns follow the order of `srcmetrics metrics`. `null` values are empty cells; their
+Metric columns follow the order of the [metric reference](/metrics/). `null` values are empty cells; their
 reasons are only in the JSON output.

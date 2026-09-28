@@ -1,42 +1,19 @@
 //! Cognitive Complexity (ADR-0014).
 
 use super::common::{is_continuation, is_nesting, nesting_levels};
-use super::{
-    Applicability::*, Calculator, Ja, MetricDefinition, Metrics, ProgramMetrics, Scope::*, per_file,
-};
+use super::{Calculator, MetricSpec, Metrics, ProgramMetrics, Scope::*, per_file};
 use crate::ir::{File, Function, Node, NodeKind, Program};
 
 pub struct CognitiveCalculator;
 
-static DEFINITIONS: &[MetricDefinition] = &[MetricDefinition {
+static SPECS: &[MetricSpec] = &[MetricSpec {
     id: "complexity.cognitive",
-    name: "Cognitive Complexity",
-    description: "How hard a function's control flow is to understand (SonarSource).",
-    definition: "Sum of increments for breaks in linear flow, weighted by nesting.",
     scopes: &[Function, File, Project],
-    input: "Node kinds, parent links, call and logical labels",
-    calculation: "if-chain head, loop, catch, ternary, and each run of case labels (a switch): 1 + nesting \
-                  level. else if / elif and else: 1. Each sequence of like logical operators: 1. A call \
-                  to the function's own name (recursion): 1. Nesting levels are opened by branches, loops, \
-                  cases, catches and ternaries. File: sum over functions. Project: sum over files.",
-    unit: "count",
-    applicability: PartiallyLanguageDependent,
-    limitations: "Nested functions (lambdas) are measured separately instead of adding to the enclosing \
-                  function. Labelled break / continue and goto add nothing (jumps have no labels in the IR).",
-    reference: "Campbell, G. A. (2018). Cognitive Complexity: A new way of measuring understandability. SonarSource.",
-    ja: Ja {
-        name: "Cognitive Complexity",
-        description: "関数の制御の流れの理解しにくさ（SonarSource）。",
-        definition: "直線的な流れを断ち切る構造ごとの加算を、ネストで重み付けした合計。",
-        input: "ノードの種類、親子関係、呼び出しと論理演算子のラベル",
-        calculation: "if の連鎖の先頭、ループ、catch、三項演算子、連続する case ラベル（switch）：1 + ネストのレベル。else if / elif と else：1。同じ論理演算子の並び：1。自分と同じ名前の呼び出し（再帰）：1。ネストのレベルは分岐、ループ、case、catch、三項演算子で深くなる。ファイル：関数の合計。プロジェクト：ファイルの合計。",
-        limitations: "入れ子関数（ラムダ）は外側の関数に加算せず、別に計測する。ラベル付きの break / continue や goto は加算しない（IR のジャンプはラベルを持たない）。",
-    },
 }];
 
 impl Calculator for CognitiveCalculator {
-    fn definitions(&self) -> &'static [MetricDefinition] {
-        DEFINITIONS
+    fn specs(&self) -> &'static [MetricSpec] {
+        SPECS
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {

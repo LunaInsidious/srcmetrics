@@ -8,7 +8,6 @@ srcmetrics <COMMAND>
   report    自己完結の HTML レポート
   model     実験的な可読性モデル（train / predict）
   serve     HTTP API と Web UI
-  metrics   メトリクス定義
 ```
 
 エラー時は終了コード 1 と、次に何をすべきかを示すメッセージを出します。
@@ -61,10 +60,3 @@ srcmetrics serve [--bind 127.0.0.1] [--port 8080]
 
 [HTTP API](./http-api) を参照してください。
 
-## metrics
-
-```sh
-srcmetrics metrics [--format json|markdown]
-```
-
-すべてのメトリクス定義（id、名前、説明、定義、スコープ、入力、計算方法、単位、言語依存性、制約、参考文献）を出力します。同じ内容が[メトリクス定義](/ja/metrics/)にあります。

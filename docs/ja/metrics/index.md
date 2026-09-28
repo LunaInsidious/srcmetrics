@@ -1,10 +1,8 @@
-<!-- Generated from crates/srcmetrics/src/metrics. Do not edit; run `UPDATE_DOCS=1 cargo test -p srcmetrics --test docs`. -->
-
 # メトリクス定義
 
 各メトリクスは、下の表のスコープで、ID ごとに個別に出力されます。計算できない値は 0 ではなく `null` になり、理由が `unavailable` に入ります。
 
-メトリクス定義のバージョン：`0.1.0`（すべての解析結果に記録されます）。
+計算方法が変わると、メトリクス定義のバージョンが変わります。解析結果には、計算に使ったバージョンが記録されます（`run.metric_definition_version`）。
 
 | メトリクス | 名前 | スコープ | 単位 |
 |---|---|---|---|

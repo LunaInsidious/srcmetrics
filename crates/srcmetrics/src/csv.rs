@@ -16,7 +16,7 @@ const FIXED_COLUMNS: [&str; 8] = [
 
 /// Renders the result as CSV. Unavailable values are empty cells (the reasons are in the JSON output).
 pub fn to_csv(result: &AnalysisResult) -> String {
-    let ids: Vec<&str> = metrics::definitions().iter().map(|d| d.id).collect();
+    let ids: Vec<&str> = metrics::specs().iter().map(|d| d.id).collect();
     let row = |fixed: [&str; 8], values: Option<&MetricsOutput>| -> String {
         let value = |id: &str| values.and_then(|v| v.metrics.get(id).copied().flatten());
         let metric_cells = ids
@@ -116,7 +116,7 @@ mod tests {
                 "error"
             ]
         );
-        let ids: Vec<_> = crate::metrics::definitions().iter().map(|d| d.id).collect();
+        let ids: Vec<_> = crate::metrics::specs().iter().map(|d| d.id).collect();
         assert_eq!(header[8..], ids[..]);
     }
 
