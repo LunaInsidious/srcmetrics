@@ -119,3 +119,34 @@ fn analyze_can_print_csv() {
         "{text}"
     );
 }
+
+/// Analyzes `fixture` into a JSON result file under target/ and returns its path.
+fn analyzed(fixture_name: &str) -> String {
+    let dir = format!("{}/../../target/cli-test", env!("CARGO_MANIFEST_DIR"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let out = format!("{dir}/{}.json", fixture_name.replace('/', "_"));
+    assert!(
+        codestat(&["analyze", &fixture(fixture_name), "-o", &out])
+            .status
+            .success()
+    );
+    out
+}
+
+#[test]
+fn stats_summarizes_functions_by_language() {
+    let result = analyzed("equivalence");
+    let value = json(&codestat(&["stats", &result, "--scope", "function"]));
+    let languages = value["by_language"].as_object().unwrap().len();
+    assert_eq!(value["units"], 2 * languages);
+    // The same algorithm in every language: cyclomatic complexity has no spread across languages.
+    assert_eq!(value["metrics"]["complexity.cyclomatic"]["median"], 4.5);
+    assert!(value["correlations"].as_array().unwrap().len() > 10);
+}
+
+#[test]
+fn stats_rejects_a_file_that_is_not_a_result() {
+    let output = codestat(&["stats", &fixture("mixed/ok.py")]);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("codestat analyze"));
+}

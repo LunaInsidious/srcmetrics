@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use codestat::analyze::analyze;
 use codestat::metrics;
 use codestat::result::{AnalysisResult, FileResult};
+use codestat::stats::{self, UnitScope};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -33,6 +34,15 @@ enum Command {
         #[arg(long, value_enum, default_value_t = ResultFormat::Json)]
         format: ResultFormat,
     },
+    /// Descriptive statistics, per-language baselines and correlations of analysis results (JSON).
+    Stats {
+        /// Result files written by `codestat analyze` (JSON).
+        #[arg(required = true)]
+        results: Vec<PathBuf>,
+        /// Unit of analysis.
+        #[arg(long, value_enum, default_value_t = Unit::File)]
+        scope: Unit,
+    },
     /// List the metric definitions.
     Metrics {
         #[arg(long, value_enum, default_value_t = DefinitionFormat::Json)]
@@ -44,6 +54,21 @@ enum Command {
 enum ResultFormat {
     Json,
     Csv,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Unit {
+    File,
+    Function,
+}
+
+impl From<Unit> for UnitScope {
+    fn from(unit: Unit) -> Self {
+        match unit {
+            Unit::File => UnitScope::File,
+            Unit::Function => UnitScope::Function,
+        }
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -78,6 +103,13 @@ fn run(command: Command) -> Result<(), String> {
             };
             write(output, &text)
         }
+        Command::Stats { results, scope } => {
+            let results = load_results(&results)?;
+            let scope = UnitScope::from(scope);
+            let report =
+                stats::Report::of(&stats::units(&results, scope), &stats::metric_ids(scope));
+            write(None, &to_json(&report)?)
+        }
         Command::Metrics { format } => {
             let definitions = metrics::definitions();
             let text = match format {
@@ -87,6 +119,18 @@ fn run(command: Command) -> Result<(), String> {
             write(None, &text)
         }
     }
+}
+
+fn load_results(paths: &[PathBuf]) -> Result<Vec<AnalysisResult>, String> {
+    paths
+        .iter()
+        .map(|p| {
+            let text = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+            serde_json::from_str(&text).map_err(|e| {
+                format!("{}: not an analysis result ({e}); create one with `codestat analyze <PATH> -o result.json`", p.display())
+            })
+        })
+        .collect()
 }
 
 fn to_json(value: &impl serde::Serialize) -> Result<String, String> {
