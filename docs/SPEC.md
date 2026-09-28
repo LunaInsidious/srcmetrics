@@ -14,7 +14,10 @@ crates/codestat/          コアライブラリ（同期・ネットワーク非
   src/analyze.rs          解析パイプライン（パス走査 → IR → メトリクス → 結果）
   src/result.rs           解析結果の型（JSON 形式）
   src/csv.rs              CSV 出力
-crates/codestat-cli/      CLI（clap）
+  src/stats.rs            記述統計・言語別ベースライン・相関（Phase 4）
+  src/model.rs            実験的な可読性モデル（利用者のラベルから学習するリッジ回帰。Phase 4）
+  src/report.rs           自己完結 HTML レポート（Phase 4）
+crates/codestat-cli/      CLI（clap）と HTTP サーバ（axum。src/serve.rs, src/ui.html）
 tests/fixtures/           言語別フィクスチャ
 ```
 
@@ -146,11 +149,43 @@ Metric Engine は変更しない。
 
 ```text
 codestat analyze <PATH> [--project NAME] [-o FILE] [--format json|csv]   解析結果を出力（CSV は ADR-0016）
-codestat metrics [--format json|markdown]            メトリクス定義を出力（markdown は docs/METRICS.md と同一）
+codestat metrics [--format json|markdown]                              メトリクス定義を出力（markdown は docs/METRICS.md と同一）
+codestat stats <RESULT.json>... [--scope file|function]               記述統計・言語別ベースライン・相関（ADR-0018）
+codestat report <RESULT.json> [-o FILE]                               自己完結 HTML レポート（ADR-0020）
+codestat model train --labels LABELS.csv [--features ids] [--lambda L] [-o MODEL.json] <RESULT.json>...
+codestat model predict --model MODEL.json <RESULT.json>...             実験的モデル（ADR-0019。既定の重みはない）
+codestat serve [--bind 127.0.0.1] [--port 8080]                       HTTP API と Web UI（ADR-0021）
 ```
 
 - 解析できなかったファイルがあれば、結果に含めたうえで stderr に件数と理由を出す（終了コードは 0）
-- パスが存在しない・未対応拡張子のファイルを直接指定した等は、終了コード 1 と対処方法付きのメッセージ
+- パスが存在しない・未対応拡張子のファイルを直接指定した・結果 JSON でないファイルを渡した等は、終了コード 1 と対処方法付きのメッセージ
+
+### 典型的な使い方
+
+```sh
+codestat analyze src -o result.json
+codestat stats result.json --scope function > stats.json
+codestat report result.json -o report.html
+# 人間の評価 labels.csv（path,function,score）があれば
+codestat model train --labels labels.csv -o model.json result.json
+codestat model predict --model model.json result.json
+```
+
+### HTTP API（`codestat serve`）
+
+| メソッド・パス | 内容 |
+|---|---|
+| `GET /` | ソースを貼り付けて解析する UI |
+| `GET /api/metrics` | メトリクス定義（JSON） |
+| `POST /api/analyze` | `{"filename", "source"}` → 1 ファイルの解析結果（§6 と同じ形式）。未対応拡張子・構文エラーは 400 と `{"error"}` |
+
+既定では 127.0.0.1 だけで待ち受ける。認証はない。
+
+## 7.1 Phase 4 の分析機能
+
+- 統計（ADR-0018）：単位（ファイル／関数）ごとに n, missing, mean, sd, min, Q1, median, Q3, max。言語別にも同じ。全メトリクス対の Pearson / Spearman（両方の値がある単位のみ、3 単位未満・分散 0 は null）
+- モデル（ADR-0019）：ラベルの付いた単位でリッジ回帰を学習。特徴量は z 標準化し、学習時の R² と 5 分割交差検証の RMSE を記録。使えない特徴量（ラベル付き単位で null がある、定数）は理由付きで除外。ラベルがすべて同じ値、ラベルが単位と一意に対応しない等はエラー
+- レポート（ADR-0020）：実行メタデータ、プロジェクトのメトリクス、言語別中央値、ヒストグラム、関数メトリクスの Spearman ヒートマップ。外部リソースを読み込まない
 
 ## 8. エラー
 
@@ -171,4 +206,6 @@ codestat metrics [--format json|markdown]            メトリクス定義を出
 | `tests/engine.rs` | 定義と出力の整合、言語横断の等価性、Metric Engine の言語非依存性 |
 | `tests/docs.rs` | METRICS.md の同期 |
 | `tests/analyze.rs` | ディレクトリ解析、エラーファイルの記録、run メタデータ、JSON 往復 |
+| `tests/model.rs` | ラベルの照合、学習、予測 |
 | `crates/codestat-cli/tests/cli.rs` | CLI の出力と終了コード |
+| `crates/codestat-cli/tests/serve.rs` | HTTP API / UI（実際にサーバを起動） |
