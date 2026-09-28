@@ -551,3 +551,180 @@ PLAN §8.1, §8.2 はメトリクス名を挙げるだけで、行の分類・�
 | Date | Status | Change |
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0008: Halstead の Operator / Operand 分類
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** metrics, halstead
+
+## Context
+
+### Problem
+
+PLAN §8.3 は「Operator / Operand の分類方法を仕様として明確に定義する」ことを求めている。Halstead の原典は言語ごとに分類が異なり、ツール間でも値が一致しない。
+
+## Decision
+
+IR の TokenKind だけで分類する。
+
+| 分類 | TokenKind |
+|---|---|
+| Operator | `operator`, `keyword`, 開き括弧 `(` `[` `{`（punctuation） |
+| Operand | `identifier`, `literal` |
+| 数えない | `comment`, `,` `;` 閉じ括弧 `)` `]` `}`（punctuation） |
+
+- 括弧は対で 1 つの operator とし、開き括弧だけを数える
+- 区切り記号（`,` `;`）は数えない。Python のように文末記号がない言語との差を小さくするため
+- 異なり数（n1, n2）はトークンテキストの完全一致で数える
+- 派生値：n = n1 + n2、N = N1 + N2、V = N·log2(n)、D = (n1/2)·(N2/n2)、E = D·V、T = E/18（秒）、B = V/3000
+- スコープ：関数（関数の範囲内のトークン。Size と同じくテキスト上の量なので入れ子関数を含む）、ファイル、プロジェクト（全ファイルのトークンを合わせて異なり数を数える）
+- 分母が 0 の場合（n = 0 の V、n2 = 0 の D など）は `not_applicable`
+
+### Rationale
+
+- TokenKind は ADR-0004 の汎用規則で全言語同じように決まるため、Halstead も Mapping の変更なしで全言語に適用できる
+
+## Alternatives Considered
+
+### 言語ごとに operator 表を持つ
+**Pros** 原典に近い値
+**Cons** Mapping が肥大化し、言語間の定義差が大きくなる
+**Rejected because:** 言語非依存性（§6）を優先
+
+## Consequences
+
+### Negative
+- keyword を operator とするため、型名キーワード（`int` など）も operator になる（METRICS.md の limitations に記載）
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0009: 重複検出の単位とアルゴリズム
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** metrics, duplication, algorithm
+
+## Context
+
+### Problem
+
+PLAN §8.5 は「行・トークン・正規化トークン等を比較検討し、定義を固定する」ことを求めている。
+
+## Decision
+
+**正規化トークン列の固定長窓の一致**で検出する。
+
+- 正規化：identifier → `$id`、literal → `$lit`、comment は除外、それ以外はテキストのまま（変数名・値だけが違う「Type-2 クローン」を検出する）
+- 最小一致長：**50 トークン**（固定）
+- 手順
+  1. 各トークン位置から始まる 50 トークンの窓のハッシュを計算する
+  2. 同じハッシュの窓を集め、実際にトークン列が等しいか確認する（ハッシュ衝突の排除）
+  3. 2 回以上出現する窓に含まれるトークンを「重複トークン」とする
+  4. 重複トークンが連続する最大区間を 1 つの「重複ブロック」とする
+- スコープ
+  - ファイル：同じファイル内での重複だけを数える（他のファイルに依存しないので、ファイル単位の値が再現可能）
+  - プロジェクト：全ファイルをまたいだ重複を数える
+
+### Rationale
+
+- 行単位は整形（改行位置）の違いに弱く、言語ごとの行の書き方にも依存する
+- 正規化しないトークン列では、変数名を変えただけのコピーを検出できない
+- 50 トークンは jscpd の既定値と同じ水準で、定型の短い並び（引数リスト等）を誤検出しにくい
+
+## Alternatives Considered
+
+### 行単位の比較
+**Rejected because:** 整形・言語の差に弱い
+
+### AST 部分木の比較
+**Pros** 構文単位で正確
+**Cons** IR は完全な AST ではない（§19-3）。計算量も大きい
+**Rejected because:** IR の方針と合わない
+
+### 最小一致長を設定可能にする
+**Cons** 値が設定に依存し、結果の比較（§17）が難しくなる
+**Rejected because:** 再現性を優先。必要になったら定義のバージョンを上げて変更する
+
+## Consequences
+
+### Negative
+- 同じトークンの繰り返し（長い配列リテラル等）も重複として検出される
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0010: 解析結果の形式と実行メタデータ
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** output, reproducibility
+
+## Context
+
+### Problem
+
+PLAN §11 は JSON 出力、§17 は Project / Repository / Commit / File / Language / Parser Version / Metric Definition Version / Timestamp の識別を求めている。
+
+## Decision
+
+```json
+{
+  "run": {
+    "project": "codestat", "repository": "git@...", "commit": "abc123",
+    "tool_version": "0.1.0", "metric_definition_version": "0.1.0",
+    "parsers": {"c": "tree-sitter 0.27.0 / tree-sitter-c 0.24.2"},
+    "timestamp": "2026-09-29T00:00:00Z"
+  },
+  "project": {"metrics": {...}, "unavailable": {...}},
+  "files": [{
+    "path": "src/a.c", "language": "c", "status": "ok",
+    "metrics": {"size.loc": 10, "size.comment_ratio": null},
+    "unavailable": {"size.comment_ratio": "not_applicable"},
+    "functions": [{"name": "f", "start_line": 1, "end_line": 5, "metrics": {...}, "unavailable": {...}}]
+  }, {
+    "path": "src/b.c", "language": "c", "status": "error", "error": "src/b.c:3:1: parse error: ..."
+  }]
+}
+```
+
+- メトリクス名は定義 ID（`size.loc` 等）をそのまま使う
+- `metrics` の値は数値か `null`。`null` の理由は `unavailable` に `not_applicable` / `unsupported` / `error: <message>` で書く
+- `repository` / `commit` は解析対象ディレクトリの git 情報。git 管理外なら `null`（推測しない）
+- Parser Version は grammar クレートのバージョンを Mapping に定数で持ち、`Cargo.lock` と一致するかをテストで検査する
+- 解析対象：指定されたディレクトリを `.gitignore` を尊重して走査し、対応拡張子のファイルだけを対象とする。明示的に指定したファイルが未対応拡張子ならエラー
+- パース失敗ファイルは `status: "error"` で記録し、プロジェクト集計には含めない
+- ファイル順はパスの辞書順（再現性、§13.1）
+
+### Rationale
+
+- ID をそのまま使うと、定義書（METRICS.md）と出力が 1 対 1 で対応する
+- 値と理由を分けると、数値列だけを取り出して統計処理しやすい（Phase 4）
+
+## Alternatives Considered
+
+### 各値を `{"value": 1, "status": "available"}` にする
+**Cons** 出力が冗長で、統計処理の前に展開が必要
+**Rejected because:** 大半の値は available なので、例外だけを別に書く方が扱いやすい
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |

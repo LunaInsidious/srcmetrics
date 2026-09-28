@@ -215,3 +215,168 @@ Mean nesting level of statements.
 | Limitations | Inherits the statement differences of size.statement_count. |
 | Reference | - |
 
+## `halstead.unique_operators` — Unique Operators
+
+n1.
+
+| Item | Value |
+|---|---|
+| Definition | Number of distinct operators. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.unique_operands` — Unique Operands
+
+n2.
+
+| Item | Value |
+|---|---|
+| Definition | Number of distinct operands. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.total_operators` — Total Operators
+
+N1.
+
+| Item | Value |
+|---|---|
+| Definition | Number of operator occurrences. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.total_operands` — Total Operands
+
+N2.
+
+| Item | Value |
+|---|---|
+| Definition | Number of operand occurrences. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.vocabulary` — Vocabulary
+
+n.
+
+| Item | Value |
+|---|---|
+| Definition | n = n1 + n2. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.length` — Program Length
+
+N.
+
+| Item | Value |
+|---|---|
+| Definition | N = N1 + N2. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.volume` — Volume
+
+V.
+
+| Item | Value |
+|---|---|
+| Definition | V = N * log2(n); not_applicable when n = 0. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | bits |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.difficulty` — Difficulty
+
+D.
+
+| Item | Value |
+|---|---|
+| Definition | D = (n1 / 2) * (N2 / n2); not_applicable when n2 = 0. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | ratio |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.effort` — Effort
+
+E.
+
+| Item | Value |
+|---|---|
+| Definition | E = D * V. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.time` — Estimated Program Time
+
+T.
+
+| Item | Value |
+|---|---|
+| Definition | T = E / 18. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | seconds |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
+## `halstead.bugs` — Estimated Bugs
+
+B.
+
+| Item | Value |
+|---|---|
+| Definition | B = V / 3000. |
+| Scope | function, file, project |
+| Input | Tokens (kind and text) |
+| Calculation | Operators: keyword and operator tokens and opening brackets ( [ {. Operands: identifier and literal tokens. Commas, semicolons, closing brackets and comments are not counted. Distinct = same token text. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
+| Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
+
