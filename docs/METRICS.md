@@ -185,6 +185,96 @@ Number of linearly independent paths (McCabe).
 | Limitations | Which constructs are decisions follows each language Mapping (e.g. Python comprehension `for`/`if` clauses count; Python `case _` counts as a case). |
 | Reference | McCabe, T. J. (1976). A Complexity Measure. IEEE TSE SE-2(4). |
 
+## `complexity.branch_count` — Branch Count
+
+Number of branch nodes (if, else if, elif) plus non-default case labels.
+
+| Item | Value |
+|---|---|
+| Definition | Number of branch nodes (if, else if, elif) plus non-default case labels. |
+| Scope | function, file, project |
+| Input | Node kinds |
+| Calculation | Function: excluding nested functions. File: the whole file. Project: sum over files. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Which constructs map to each node kind follows each language Mapping. |
+| Reference | - |
+
+## `complexity.conditional_count` — Conditional Count
+
+Number of conditional (ternary) expressions.
+
+| Item | Value |
+|---|---|
+| Definition | Number of conditional (ternary) expressions. |
+| Scope | function, file, project |
+| Input | Node kinds |
+| Calculation | Function: excluding nested functions. File: the whole file. Project: sum over files. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Which constructs map to each node kind follows each language Mapping. |
+| Reference | - |
+
+## `complexity.loop_count` — Loop Count
+
+Number of loops.
+
+| Item | Value |
+|---|---|
+| Definition | Number of loops. |
+| Scope | function, file, project |
+| Input | Node kinds |
+| Calculation | Function: excluding nested functions. File: the whole file. Project: sum over files. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Which constructs map to each node kind follows each language Mapping. |
+| Reference | - |
+
+## `complexity.return_count` — Return Count
+
+Number of return statements.
+
+| Item | Value |
+|---|---|
+| Definition | Number of return statements. |
+| Scope | function, file, project |
+| Input | Node kinds |
+| Calculation | Function: excluding nested functions. File: the whole file. Project: sum over files. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Which constructs map to each node kind follows each language Mapping. |
+| Reference | - |
+
+## `complexity.jump_count` — Jump Count
+
+Number of jumps: break, continue, goto and throw / raise.
+
+| Item | Value |
+|---|---|
+| Definition | Number of jumps: break, continue, goto and throw / raise. |
+| Scope | function, file, project |
+| Input | Node kinds |
+| Calculation | Function: excluding nested functions. File: the whole file. Project: sum over files. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Which constructs map to each node kind follows each language Mapping. |
+| Reference | - |
+
+## `complexity.path_count` — Number of Paths
+
+Acyclic execution paths through a function.
+
+| Item | Value |
+|---|---|
+| Definition | Number of paths through the function when each loop runs zero times or once. |
+| Scope | function |
+| Input | Node kinds and tree structure |
+| Calculation | Children in sequence multiply. An if-chain is the sum of its arms, +1 without a final else. A loop or ternary is its children's product + 1. Consecutive case labels or catch clauses are the sum of their paths + 1. Nested functions count as 1. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Not Nejmeh's NPATH: short-circuit operators and early exits (return, jump) do not change the count. |
+| Reference | Nejmeh, B. A. (1988). NPATH: a measure of execution path complexity. CACM 31(2) (related, not identical). |
+
 ## `nesting.max_depth` — Maximum Nesting Depth
 
 Deepest nesting of control structures.

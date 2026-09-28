@@ -1,30 +1,87 @@
-//! Complexity Metrics (PLAN.md §8.2).
+//! Complexity Metrics (PLAN.md §8.2, ADR-0007, ADR-0011).
 
-use super::common::is_decision;
+use super::common::{is_continuation, is_decision};
 use super::{
     Applicability::*, Calculator, MetricDefinition, Metrics, ProgramMetrics, Scope::*, per_file,
 };
-use crate::ir::{File, Function, Node, Program};
+use crate::ir::{File, Function, Node, NodeId, NodeKind, Program};
 
 pub struct ComplexityCalculator;
 
-static DEFINITIONS: &[MetricDefinition] = &[MetricDefinition {
-    id: "complexity.cyclomatic",
-    name: "Cyclomatic Complexity",
-    description: "Number of linearly independent paths (McCabe).",
-    definition: "1 + number of decision points in a function.",
-    scopes: &[Function, File, Project],
-    input: "Node kinds: branch, loop, case, catch, logical, conditional",
-    calculation: "Function: 1 + decision nodes, excluding nested functions. Each `else if` / `elif`, \
-                  each short-circuit operator (&&, ||, and, or), each ternary and each non-default case \
-                  label is one decision. File: sum over its functions + decisions in top-level code. \
-                  Project: sum over files.",
-    unit: "count",
-    applicability: PartiallyLanguageDependent,
-    limitations: "Which constructs are decisions follows each language Mapping (e.g. Python comprehension \
-                  `for`/`if` clauses count; Python `case _` counts as a case).",
-    reference: "McCabe, T. J. (1976). A Complexity Measure. IEEE TSE SE-2(4).",
-}];
+const ALL_SCOPES: &[super::Scope] = &[Function, File, Project];
+
+const fn count(id: &'static str, name: &'static str, definition: &'static str) -> MetricDefinition {
+    MetricDefinition {
+        id,
+        name,
+        description: definition,
+        definition,
+        scopes: ALL_SCOPES,
+        input: "Node kinds",
+        calculation: "Function: excluding nested functions. File: the whole file. Project: sum over files.",
+        unit: "count",
+        applicability: PartiallyLanguageDependent,
+        limitations: "Which constructs map to each node kind follows each language Mapping.",
+        reference: "",
+    }
+}
+
+static DEFINITIONS: &[MetricDefinition] = &[
+    MetricDefinition {
+        id: "complexity.cyclomatic",
+        name: "Cyclomatic Complexity",
+        description: "Number of linearly independent paths (McCabe).",
+        definition: "1 + number of decision points in a function.",
+        scopes: ALL_SCOPES,
+        input: "Node kinds: branch, loop, case, catch, logical, conditional",
+        calculation: "Function: 1 + decision nodes, excluding nested functions. Each `else if` / `elif`, \
+                      each short-circuit operator (&&, ||, and, or), each ternary and each non-default case \
+                      label is one decision. File: sum over its functions + decisions in top-level code. \
+                      Project: sum over files.",
+        unit: "count",
+        applicability: PartiallyLanguageDependent,
+        limitations: "Which constructs are decisions follows each language Mapping (e.g. Python comprehension \
+                      `for`/`if` clauses count; Python `case _` counts as a case).",
+        reference: "McCabe, T. J. (1976). A Complexity Measure. IEEE TSE SE-2(4).",
+    },
+    count(
+        "complexity.branch_count",
+        "Branch Count",
+        "Number of branch nodes (if, else if, elif) plus non-default case labels.",
+    ),
+    count(
+        "complexity.conditional_count",
+        "Conditional Count",
+        "Number of conditional (ternary) expressions.",
+    ),
+    count("complexity.loop_count", "Loop Count", "Number of loops."),
+    count(
+        "complexity.return_count",
+        "Return Count",
+        "Number of return statements.",
+    ),
+    count(
+        "complexity.jump_count",
+        "Jump Count",
+        "Number of jumps: break, continue, goto and throw / raise.",
+    ),
+    MetricDefinition {
+        id: "complexity.path_count",
+        name: "Number of Paths",
+        description: "Acyclic execution paths through a function.",
+        definition: "Number of paths through the function when each loop runs zero times or once.",
+        scopes: &[Function],
+        input: "Node kinds and tree structure",
+        calculation: "Children in sequence multiply. An if-chain is the sum of its arms, +1 without a final \
+                      else. A loop or ternary is its children's product + 1. Consecutive case labels or catch \
+                      clauses are the sum of their paths + 1. Nested functions count as 1.",
+        unit: "count",
+        applicability: PartiallyLanguageDependent,
+        limitations: "Not Nejmeh's NPATH: short-circuit operators and early exits (return, jump) do not \
+                      change the count.",
+        reference: "Nejmeh, B. A. (1988). NPATH: a measure of execution path complexity. CACM 31(2) (related, not identical).",
+    },
+];
 
 impl Calculator for ComplexityCalculator {
     fn definitions(&self) -> &'static [MetricDefinition] {
@@ -32,32 +89,160 @@ impl Calculator for ComplexityCalculator {
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {
-        let mut result = per_file(program, file_metrics, function_metrics);
-        let total: usize = program.files.iter().map(file_cyclomatic).sum();
-        result.project.insert("complexity.cyclomatic", total.into());
+        let mut result = per_file(
+            program,
+            |file| Counts::of(file.nodes.iter()).metrics(),
+            function_metrics,
+        );
+        let project = program
+            .files
+            .iter()
+            .map(|f| Counts::of(f.nodes.iter()))
+            .fold(Counts::default(), Counts::add);
+        result.project = project.metrics();
         result
     }
 }
 
-fn decisions<'a>(nodes: impl Iterator<Item = &'a Node>) -> usize {
-    nodes.filter(|n| is_decision(n.kind)).count()
-}
-
-fn cyclomatic(file: &File, function: &Function) -> usize {
-    1 + decisions(file.function_nodes(function))
-}
-
 fn function_metrics(file: &File, function: &Function) -> Metrics {
-    Metrics::from([("complexity.cyclomatic", cyclomatic(file, function).into())])
+    let counts = Counts {
+        functions: 1,
+        ..Counts::of(file.function_nodes(function))
+    };
+    let mut m = counts.metrics();
+    m.insert(
+        "complexity.path_count",
+        paths(file, file.node(function.node)).into(),
+    );
+    m
 }
 
-fn file_cyclomatic(file: &File) -> usize {
-    let functions: usize = file.functions.iter().map(|f| cyclomatic(file, f)).sum();
-    functions + decisions(file.top_level_nodes())
+/// Node-kind tallies. Cyclomatic = functions + decisions: 1 + decisions per function, and
+/// top-level decisions add to the file total.
+#[derive(Default, Clone, Copy)]
+struct Counts {
+    functions: usize,
+    decisions: usize,
+    branches: usize,
+    conditionals: usize,
+    loops: usize,
+    returns: usize,
+    jumps: usize,
 }
 
-fn file_metrics(file: &File) -> Metrics {
-    Metrics::from([("complexity.cyclomatic", file_cyclomatic(file).into())])
+impl Counts {
+    fn of<'a>(nodes: impl Iterator<Item = &'a Node>) -> Counts {
+        let mut c = Counts::default();
+        for n in nodes {
+            c.decisions += is_decision(n.kind) as usize;
+            match n.kind {
+                NodeKind::Function => c.functions += 1,
+                NodeKind::Branch | NodeKind::Case => c.branches += 1,
+                NodeKind::Conditional => c.conditionals += 1,
+                NodeKind::Loop => c.loops += 1,
+                NodeKind::Return => c.returns += 1,
+                NodeKind::Jump => c.jumps += 1,
+                _ => {}
+            }
+        }
+        c
+    }
+
+    fn add(self, o: Counts) -> Counts {
+        Counts {
+            functions: self.functions + o.functions,
+            decisions: self.decisions + o.decisions,
+            branches: self.branches + o.branches,
+            conditionals: self.conditionals + o.conditionals,
+            loops: self.loops + o.loops,
+            returns: self.returns + o.returns,
+            jumps: self.jumps + o.jumps,
+        }
+    }
+
+    fn metrics(&self) -> Metrics {
+        Metrics::from([
+            (
+                "complexity.cyclomatic",
+                (self.functions + self.decisions).into(),
+            ),
+            ("complexity.branch_count", self.branches.into()),
+            ("complexity.conditional_count", self.conditionals.into()),
+            ("complexity.loop_count", self.loops.into()),
+            ("complexity.return_count", self.returns.into()),
+            ("complexity.jump_count", self.jumps.into()),
+        ])
+    }
+}
+
+/// Number of acyclic paths through `node` (ADR-0011).
+fn paths(file: &File, node: &Node) -> f64 {
+    match node.kind {
+        NodeKind::Branch if !is_continuation(file, node) => {
+            let (arms, has_else) = chain_arms(file, node);
+            arms + if has_else { 0.0 } else { 1.0 }
+        }
+        NodeKind::Loop | NodeKind::Conditional => sequence(file, &node.children) + 1.0,
+        _ => sequence(file, &node.children),
+    }
+}
+
+/// Sum of the paths of every arm of an if-chain, and whether it ends with an `else`.
+/// Handles both chain shapes: C-style (`else { if ... }`) and Python-style (`elif` children).
+fn chain_arms(file: &File, branch: &Node) -> (f64, bool) {
+    let is_arm_link = |n: &Node| n.kind == NodeKind::Else || is_continuation(file, n);
+    let then: Vec<NodeId> = branch
+        .children
+        .iter()
+        .copied()
+        .filter(|c| !is_arm_link(file.node(*c)))
+        .collect();
+    let (mut sum, mut has_else) = (sequence(file, &then), false);
+    for child in branch
+        .children
+        .iter()
+        .map(|c| file.node(*c))
+        .filter(|c| is_arm_link(c))
+    {
+        let continuation = if child.kind == NodeKind::Else {
+            child
+                .children
+                .iter()
+                .map(|c| file.node(*c))
+                .find(|c| is_continuation(file, c))
+        } else {
+            Some(child)
+        };
+        match continuation {
+            Some(next) => {
+                let (s, e) = chain_arms(file, next);
+                sum += s;
+                has_else |= e;
+            }
+            None => {
+                sum += paths(file, child);
+                has_else = true;
+            }
+        }
+    }
+    (sum, has_else)
+}
+
+/// Paths through children executed in order. Runs of consecutive `case` or `catch` siblings are
+/// alternatives (sum + 1); everything else multiplies. Nested functions count as 1.
+fn sequence(file: &File, children: &[NodeId]) -> f64 {
+    let kind = |id: &NodeId| file.node(*id).kind;
+    let is_alternative = |k: NodeKind| matches!(k, NodeKind::Case | NodeKind::Catch);
+    children
+        .chunk_by(|a, b| is_alternative(kind(a)) && kind(a) == kind(b))
+        .map(|run| match kind(&run[0]) {
+            k if is_alternative(k) => {
+                run.iter().map(|c| paths(file, file.node(*c))).sum::<f64>() + 1.0
+            }
+            NodeKind::Function => 1.0,
+            _ => paths(file, file.node(run[0])),
+        })
+        .product()
 }
 
 #[cfg(test)]
@@ -140,6 +325,117 @@ mod tests {
         assert_eq!(
             ComplexityCalculator.compute(&program).project["complexity.cyclomatic"],
             v(16.0)
+        );
+    }
+
+    #[test]
+    fn counts_control_structures() {
+        let result = ComplexityCalculator.compute(&sample());
+        let f = &result.files[0].functions[0];
+        assert_eq!(f["complexity.branch_count"], v(2.0));
+        assert_eq!(f["complexity.conditional_count"], v(1.0));
+        assert_eq!(f["complexity.loop_count"], v(1.0));
+        assert_eq!(f["complexity.return_count"], v(1.0));
+        assert_eq!(f["complexity.jump_count"], v(0.0));
+        let file = &result.files[0].metrics;
+        assert_eq!(file["complexity.branch_count"], v(3.0));
+    }
+
+    fn paths_of(build: impl FnOnce(&mut FileBuilder, crate::ir::NodeId)) -> MetricValue {
+        let mut b = FileBuilder::new("");
+        let root = b.root();
+        let body = b.function(root, "f", 0, lines(1, 1));
+        build(&mut b, body);
+        let result = ComplexityCalculator.compute(&Program {
+            files: vec![b.build()],
+        });
+        result.files[0].functions[0]["complexity.path_count"].clone()
+    }
+
+    #[test]
+    fn straight_line_code_has_one_path() {
+        assert_eq!(
+            paths_of(|b, f| {
+                b.node(f, Statement);
+            }),
+            v(1.0)
+        );
+    }
+
+    #[test]
+    fn if_without_else_has_two_paths() {
+        assert_eq!(
+            paths_of(|b, f| {
+                b.node(f, Branch);
+            }),
+            v(2.0)
+        );
+    }
+
+    #[test]
+    fn c_style_else_if_chain_sums_its_arms() {
+        // if {} else if {} else {}
+        let p = paths_of(|b, f| {
+            let head = b.node(f, Branch);
+            let e = b.node(head, Else);
+            let cont = b.node(e, Branch);
+            b.node(cont, Else);
+        });
+        assert_eq!(p, v(3.0));
+    }
+
+    #[test]
+    fn python_style_elif_chain_sums_its_arms() {
+        // if: elif: elif:   (no else)
+        let p = paths_of(|b, f| {
+            let head = b.node(f, Branch);
+            b.node(head, Branch);
+            b.node(head, Branch);
+        });
+        assert_eq!(p, v(4.0));
+    }
+
+    #[test]
+    fn sequential_structures_multiply_and_nested_ones_combine() {
+        // if {} ; while { if {} }
+        let p = paths_of(|b, f| {
+            b.node(f, Branch);
+            let lp = b.node(f, Loop);
+            b.node(lp, Branch);
+        });
+        assert_eq!(p, v(2.0 * 3.0));
+    }
+
+    #[test]
+    fn case_labels_are_alternatives() {
+        // switch { case: if {} ; case: }
+        let p = paths_of(|b, f| {
+            let switch = b.node(f, Block);
+            let first = b.node(switch, Case);
+            b.node(first, Branch);
+            b.node(switch, Case);
+        });
+        assert_eq!(p, v(2.0 + 1.0 + 1.0));
+    }
+
+    #[test]
+    fn catch_clauses_are_alternatives_to_the_normal_path() {
+        let p = paths_of(|b, f| {
+            let try_ = b.node(f, Other);
+            b.node(try_, Block);
+            b.node(try_, Catch);
+            b.node(try_, Catch);
+        });
+        assert_eq!(p, v(3.0));
+    }
+
+    #[test]
+    fn ternary_adds_an_alternative() {
+        assert_eq!(
+            paths_of(|b, f| {
+                b.node(f, Conditional);
+            }),
+            v(2.0)
         );
     }
 }

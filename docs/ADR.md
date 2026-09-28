@@ -728,3 +728,61 @@ PLAN §11 は JSON 出力、§17 は Project / Repository / Commit / File / Lang
 | Date | Status | Change |
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0011: 制御構造の個数と Number of Paths の定義
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** metrics, complexity, algorithm
+
+## Context
+
+### Problem
+
+PLAN §8.2 の Branch / Conditional / Loop / Return / Jump Count と Number of Paths の定義を決める必要がある。
+Nejmeh の NPATH は「条件式」と「then / else の本体」を区別して計算するが、IR（ADR-0003）はノードの役割（フィールド）を持たない。
+
+## Decision
+
+- **個数**：それぞれ NodeKind の個数とする（関数スコープは入れ子関数を除く。ファイルはファイル全体、プロジェクトは合計）
+  - Branch Count = `branch` + `case`（if / else-if / elif と、default 以外の case ラベル）
+  - Conditional Count = `conditional`（三項演算子）
+  - Loop Count = `loop`、Return Count = `return`、Jump Count = `jump`（break, continue, goto, throw / raise）
+- **Number of Paths**（`complexity.path_count`、関数スコープのみ）：ループを 0 回または 1 回通るとしたときの、非循環な実行経路の数。IR の構造だけから以下で計算する
+  - 通常のノード：子ノードの経路数の積（子がなければ 1）
+  - if 連鎖の先頭 `branch`：then 部分（`else` と継続 `branch` 以外の子の積）＋ else 部分（`else` 子の経路数、継続 `branch` 子の経路数、どちらもなければ 1）
+  - `loop`：子の積 ＋ 1（通らない経路）
+  - `conditional`（三項演算子）：子の積 ＋ 1（2 つの値のどちらかを通る）
+  - 兄弟の `case` の連続：各 case の経路数の和 ＋ 1（どの case にも当たらない経路／default）
+  - 兄弟の `catch` の連続：各 catch の経路数の和 ＋ 1（例外が起きない経路）
+  - 短絡演算子・return / jump による経路の打ち切りは考慮しない
+- Number of Paths は Nejmeh の NPATH とは別物として扱い、名前にも NPATH を使わない
+
+### Rationale
+
+- 役割情報を IR に追加せずに、「分岐は足し算、並びは掛け算」という経路数の本質を表せる
+- NPATH を名乗ると既存ツールと同じ値を期待されるため、別名にして定義書で違いを明示する
+
+## Alternatives Considered
+
+### IR に子ノードの役割（condition / consequence / alternative）を追加して NPATH を正確に実装する
+**Pros** 既存の NPATH と比較できる
+**Cons** 全言語の Mapping にフィールド名の対応を追加する必要があり、IR が AST に近づく（§19-3）
+**Rejected because:** 現時点では得られる利点がコストに見合わない。必要になったら ADR を追加する
+
+### Number of Paths を実装しない
+**Rejected because:** 簡単な構造規則で意味のある値を出せるため
+
+## Consequences
+
+### Negative
+- 短絡演算子による経路は数えない。三項演算子の 2 つの値の経路数は区別しない（子の積 ＋ 1 で近似）
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
