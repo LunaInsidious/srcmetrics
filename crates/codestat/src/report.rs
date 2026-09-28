@@ -218,6 +218,10 @@ fn heatmap(report: &Report, ids: &[&str]) -> String {
         )
         .unwrap();
     }
+    for i in 0..ids.len() {
+        let at = label + i as f64 * cell;
+        write!(html, "<rect x=\"{at}\" y=\"{at}\" width=\"{cell}\" height=\"{cell}\" fill=\"rgba(128,128,128,0.6)\"/>").unwrap();
+    }
     for c in &report.correlations {
         let (i, j) = (index(&c.a), index(&c.b));
         for (row, column) in [(i, j), (j, i)] {

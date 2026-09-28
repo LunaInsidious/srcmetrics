@@ -163,38 +163,7 @@ fn run(command: Command) -> Result<(), String> {
                 stats::Report::of(&stats::units(&results, scope), &stats::metric_ids(scope));
             write(None, &to_json(&report)?)
         }
-        Command::Model {
-            command:
-                ModelCommand::Train {
-                    labels,
-                    features,
-                    lambda,
-                    output,
-                    results,
-                },
-        } => {
-            let results = load_results(&results)?;
-            let text = read(&labels)?;
-            let labels =
-                model::read_labels(&text).map_err(|e| format!("{}: {e}", labels.display()))?;
-            let trained = model::train(&results, &labels, features.as_deref(), lambda)
-                .map_err(|e| e.to_string())?;
-            write(output, &to_json(&trained)?)
-        }
-        Command::Model {
-            command:
-                ModelCommand::Predict {
-                    model: path,
-                    results,
-                },
-        } => {
-            let trained = model::Model::from_json(&read(&path)?)
-                .map_err(|e| format!("{}: {e}", path.display()))?;
-            write(
-                None,
-                &to_json(&model::predict_all(&trained, &load_results(&results)?))?,
-            )
-        }
+        Command::Model { command } => run_model(command),
         Command::Report { result, output } => {
             let result = load_results(std::slice::from_ref(&result))?.remove(0);
             write(output, &codestat::report::to_html(&result))
@@ -207,6 +176,36 @@ fn run(command: Command) -> Result<(), String> {
                 DefinitionFormat::Markdown => metrics::to_markdown(&definitions),
             };
             write(None, &text)
+        }
+    }
+}
+
+fn run_model(command: ModelCommand) -> Result<(), String> {
+    match command {
+        ModelCommand::Train {
+            labels,
+            features,
+            lambda,
+            output,
+            results,
+        } => {
+            let results = load_results(&results)?;
+            let labels = model::read_labels(&read(&labels)?)
+                .map_err(|e| format!("{}: {e}", labels.display()))?;
+            let trained = model::train(&results, &labels, features.as_deref(), lambda)
+                .map_err(|e| e.to_string())?;
+            write(output, &to_json(&trained)?)
+        }
+        ModelCommand::Predict {
+            model: path,
+            results,
+        } => {
+            let trained = model::Model::from_json(&read(&path)?)
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+            write(
+                None,
+                &to_json(&model::predict_all(&trained, &load_results(&results)?))?,
+            )
         }
     }
 }

@@ -253,30 +253,7 @@ pub fn fit(
     if lambda.is_nan() || lambda < 0.0 {
         return Err(ModelError(format!("lambda must be >= 0, got {lambda}")));
     }
-    let names: Vec<&str> = match requested {
-        Some(r) => r.iter().map(String::as_str).collect(),
-        None => candidates.to_vec(),
-    };
-    let mut features = vec![];
-    let mut excluded = BTreeMap::new();
-    for name in names {
-        match unusable(rows, name) {
-            None => features.push(name.to_string()),
-            Some(reason) if requested.is_some() => {
-                return Err(ModelError(format!(
-                    "feature {name} cannot be used: {reason}; choose other features"
-                )));
-            }
-            Some(reason) => {
-                excluded.insert(name.to_string(), reason);
-            }
-        }
-    }
-    if features.is_empty() {
-        return Err(ModelError(
-            "no usable features; label more units or choose features explicitly".into(),
-        ));
-    }
+    let (features, excluded) = select_features(rows, candidates, requested)?;
     let x: Vec<Vec<f64>> = rows
         .iter()
         .map(|r| {
@@ -309,6 +286,40 @@ pub fn fit(
         cv_rmse,
         excluded_features: excluded,
     })
+}
+
+/// The usable features, and the excluded candidates with the reason. Requested features must all
+/// be usable; unusable candidates are excluded.
+fn select_features(
+    rows: &[Row],
+    candidates: &[&str],
+    requested: Option<&[String]>,
+) -> Result<(Vec<String>, BTreeMap<String, String>), ModelError> {
+    let names: Vec<&str> = match requested {
+        Some(r) => r.iter().map(String::as_str).collect(),
+        None => candidates.to_vec(),
+    };
+    let mut features = vec![];
+    let mut excluded = BTreeMap::new();
+    for name in names {
+        match unusable(rows, name) {
+            None => features.push(name.to_string()),
+            Some(reason) if requested.is_some() => {
+                return Err(ModelError(format!(
+                    "feature {name} cannot be used: {reason}; choose other features"
+                )));
+            }
+            Some(reason) => {
+                excluded.insert(name.to_string(), reason);
+            }
+        }
+    }
+    if features.is_empty() {
+        return Err(ModelError(
+            "no usable features; label more units or choose features explicitly".into(),
+        ));
+    }
+    Ok((features, excluded))
 }
 
 /// Why a feature cannot be used for these rows, if it cannot.
