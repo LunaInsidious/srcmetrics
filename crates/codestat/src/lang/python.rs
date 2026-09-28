@@ -74,5 +74,6 @@ pub static MAPPING: Mapping = Mapping {
     name_fields: &["name"],
     decorators: &["decorator"],
     docstring: Some("string"),
+    parameter_fields: &["parameters"],
     ignored_parameters: &["*", "/"],
 };

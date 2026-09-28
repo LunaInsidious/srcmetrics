@@ -44,6 +44,9 @@ pub struct Mapping {
     /// Literal node type that documents a function when it is the first statement of its body
     /// (Python docstrings). Takes precedence over a preceding comment (ADR-0013).
     pub docstring: Option<&'static str>,
+    /// Fields holding a function's parameters, in order (e.g. Go: `receiver`, `parameters`).
+    /// Looked up on the function node and along its name-field chain.
+    pub parameter_fields: &'static [&'static str],
     /// Parameter node texts that are not parameters (e.g. C `f(void)`).
     pub ignored_parameters: &'static [&'static str],
 }
@@ -397,22 +400,24 @@ impl<'a> Converter<'a> {
         })
     }
 
-    /// Parameters come from a `parameters` list field, or a single `parameter` field
-    /// (e.g. `x => x` in JavaScript). A function with neither has no parameters.
+    /// Parameters from each of the Mapping's parameter fields, in order. A field holding an
+    /// identifier is one parameter (JS `x => x`, Java `x -> ...`); any other node is a list whose
+    /// named children are the parameters.
     fn parameters(&self, ts: tree_sitter::Node) -> Vec<Parameter> {
-        let nodes: Vec<_> = if let Some(single) = self
-            .find_field(ts, "parameters")
-            .filter(|p| self.is_identifier(p))
-        {
-            vec![single] // Java `x -> ...`
-        } else if let Some(list) = self.find_field(ts, "parameters") {
-            let mut cursor = list.walk();
-            list.named_children(&mut cursor)
-                .filter(|p| !self.mapping.comments.contains(&p.kind()))
-                .collect()
-        } else {
-            ts.child_by_field_name("parameter").into_iter().collect()
-        };
+        let mut nodes = vec![];
+        for field in self.mapping.parameter_fields {
+            match self.find_field(ts, field) {
+                Some(single) if self.is_identifier(&single) => nodes.push(single),
+                Some(list) => {
+                    let mut cursor = list.walk();
+                    nodes.extend(
+                        list.named_children(&mut cursor)
+                            .filter(|p| !self.mapping.comments.contains(&p.kind())),
+                    );
+                }
+                None => {}
+            }
+        }
         nodes
             .into_iter()
             .filter(|p| !self.mapping.ignored_parameters.contains(&self.text(*p)))

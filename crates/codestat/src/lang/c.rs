@@ -70,5 +70,6 @@ pub static MAPPING: Mapping = Mapping {
     name_fields: &["declarator"],
     decorators: &[],
     docstring: None,
+    parameter_fields: &["parameters"],
     ignored_parameters: &["void"],
 };

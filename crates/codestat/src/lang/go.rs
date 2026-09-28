@@ -80,5 +80,6 @@ pub static MAPPING: Mapping = Mapping {
     name_fields: &["name"],
     decorators: &[],
     docstring: None,
+    parameter_fields: &["receiver", "parameters"],
     ignored_parameters: &[],
 };

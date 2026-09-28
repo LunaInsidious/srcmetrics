@@ -88,6 +88,7 @@ pub static TYPESCRIPT: Mapping = Mapping {
     name_fields: &["name", "pattern"],
     decorators: &["decorator"],
     docstring: None,
+    parameter_fields: &["parameters", "parameter"],
     ignored_parameters: &[],
 };
 

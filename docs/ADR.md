@@ -359,7 +359,7 @@ Mapping {
 
 - 関数名：Mapping の `name_fields`（例：C は `declarator`、Python は `name`、TypeScript は `name`, `pattern`）を順に辿り、identifier に到達したらそれを名前とする。到達しなければ無名
 - 引数名：関数名と同じ規則で辿り、到達しなければ、辿り終えたノードの子のうち「identifier であるか name_fields を持つ」最後のものを名前とする（型が先に来る書き方に対応：Python `x: int`, `*args`、Java `String... xs`）
-- 引数：フィールド `parameters` を関数ノードおよび name_fields の連鎖上で探し、その名前付き子ノード（コメントを除く）を引数とする。`parameters` 自体が identifier なら、それが唯一の引数（Java `x -> ...`）。`parameters` がなく単数の `parameter` フィールドがある場合（例：JS `x => x`）はそれを唯一の引数とする。どちらもなければ引数 0 個
+- 引数：Mapping の `parameter_fields`（既定は `parameters`。Go は `receiver`, `parameters`、JS/TS は `parameters`, `parameter`）を順に、関数ノードおよび name_fields の連鎖上で探す。フィールドのノードが identifier ならそれが 1 つの引数（JS `x => x`、Java `x -> ...`）、それ以外なら名前付き子ノード（コメントを除く）が引数。どれもなければ引数 0 個
 - 本体：フィールド `body`
 - 1 つの引数宣言に `name` フィールドが複数ある場合（Go の `a, b int`）は、名前ごとに 1 つの引数とする
 - else 節のノードがない grammar（Go, Java）：Mapping の `else_field`（`alternative`）にある子で、それ自体が `branch` でないものを `else` とする
@@ -406,6 +406,7 @@ Token は具象構文木の葉（comment / literal は部分木ごと）から�
 | 2026-09-29 | Accepted | Phase 1 レビュー指摘：template string / f-string 内のコードが IR から消えていたため `interpolations` を追加。幅 0 の葉はトークンにしない |
 | 2026-09-29 | Accepted | Go 追加：`else_field` と、複数名の引数宣言の規則を追加 |
 | 2026-09-29 | Accepted | Java 追加：関数名と引数名の規則を分離、単一 identifier の引数、default 判定を「最初の葉」に変更 |
+| 2026-09-29 | Accepted | Phase 3 レビュー指摘：Go のメソッドのレシーバ（明示的な受け手）が引数に数えられていなかったため `parameter_fields` を追加 |
 
 ---
 

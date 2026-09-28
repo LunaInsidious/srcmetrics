@@ -531,3 +531,12 @@ fn comments_above_decorators_and_attributes_are_documentation() {
     let file = parse_str("a.rs", "/// doc\n#[inline]\nfn f() {}\n");
     assert_eq!(doc_lines(&file), vec![Some((1, 1))]);
 }
+
+#[test]
+fn go_method_receivers_are_explicit_parameters() {
+    let file = parse_str("a.go", "package p\nfunc (r *T) Foo(x int) {}\n");
+    assert_eq!(
+        param_names(&file, 0),
+        ["r", "x"].map(|s| Some(s.to_string()))
+    );
+}
