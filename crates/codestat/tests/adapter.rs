@@ -382,3 +382,20 @@ fn jsx_is_supported() {
     assert_eq!(file.language, "javascript");
     assert_eq!(kind_count(&file, NodeKind::Conditional), 1);
 }
+
+#[test]
+fn rust_functions_closures_and_match_arms() {
+    let file = parse("equivalence/classify.rs");
+    assert_eq!(
+        names_and_arity(&file),
+        vec![("classify".to_string(), 2), ("max2".to_string(), 2)]
+    );
+    let file = parse_str(
+        "a.rs",
+        "impl A {\n    fn m(&self, x: i32) -> i32 {\n        let c = |y| y + 1;\n        match x { 1 => 2, _ => c(3) }\n    }\n}\n",
+    );
+    assert_eq!(file.functions.len(), 2);
+    assert_eq!(param_names(&file, 0), vec![None, Some("x".to_string())]);
+    assert_eq!(param_names(&file, 1), vec![Some("y".to_string())]);
+    assert_eq!(count(&file, 0, NodeKind::Case), 2);
+}

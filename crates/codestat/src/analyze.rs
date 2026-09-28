@@ -3,7 +3,7 @@
 use crate::error::AnalysisError;
 use crate::ir::{File, Program};
 use crate::lang::{LanguageAdapter, adapter_for_path, adapters};
-use crate::metrics::{self, DEFINITION_VERSION};
+use crate::metrics::{self, DEFINITION_VERSION, FileMetrics};
 use crate::result::{AnalysisResult, FileResult, FunctionResult, MetricsOutput, RunInfo};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -18,59 +18,49 @@ pub fn analyze(root: &Path, project: Option<&str>) -> Result<AnalysisResult, Ana
         Some(p) => p.to_string(),
         None => default_project_name(root)?,
     };
-    let targets = targets(root)?;
-    let mut parsed: Vec<Result<File, ParseFailure>> = Vec::new();
-    for (path, relative) in &targets {
+    let mut program = Program::default();
+    let mut failures = Vec::new();
+    for (path, relative) in targets(root)? {
         let adapter = adapter_for_path(&relative.to_string_lossy())?;
-        parsed.push(parse(adapter, path, relative));
+        match parse(adapter, &path, &relative) {
+            Ok(file) => program.files.push(file),
+            Err(failure) => failures.push(failure),
+        }
     }
-    let program = Program {
-        files: parsed
-            .iter()
-            .filter_map(|r| r.as_ref().ok())
-            .cloned()
-            .collect(),
-    };
     let computed = metrics::compute(&program);
-
-    let mut computed_files = program.files.iter().zip(computed.files);
-    let files = parsed
-        .into_iter()
-        .map(|r| match r {
-            Ok(_) => {
-                let (file, m) = computed_files
-                    .next()
-                    .expect("one metrics entry per parsed file");
-                FileResult::Ok {
-                    path: file.path.clone(),
-                    language: file.language.clone(),
-                    metrics: (&m.metrics).into(),
-                    functions: file
-                        .functions
-                        .iter()
-                        .zip(&m.functions)
-                        .map(|(f, fm)| FunctionResult {
-                            name: f.name.clone(),
-                            start_line: f.range.first_line(),
-                            end_line: f.range.last_line(),
-                            metrics: fm.into(),
-                        })
-                        .collect(),
-                }
-            }
-            Err((path, language, error)) => FileResult::Error {
-                path,
-                language: language.map(str::to_string),
-                error,
-            },
-        })
+    let mut files: Vec<FileResult> = program
+        .files
+        .iter()
+        .zip(&computed.files)
+        .map(|(f, m)| file_result(f, m))
         .collect();
-
+    files.extend(failures);
+    files.sort_by(|a, b| a.path().cmp(b.path()));
     Ok(AnalysisResult {
         run: run_info(root, project, &program),
         project: MetricsOutput::from(&computed.project),
         files,
     })
+}
+
+fn file_result(file: &File, metrics: &FileMetrics) -> FileResult {
+    let functions = file
+        .functions
+        .iter()
+        .zip(&metrics.functions)
+        .map(|(f, m)| FunctionResult {
+            name: f.name.clone(),
+            start_line: f.range.first_line(),
+            end_line: f.range.last_line(),
+            metrics: m.into(),
+        })
+        .collect();
+    FileResult::Ok {
+        path: file.path.clone(),
+        language: file.language.clone(),
+        metrics: (&metrics.metrics).into(),
+        functions,
+    }
 }
 
 /// (absolute path, path relative to `root`) of every analysis target, sorted by relative path.
@@ -107,24 +97,21 @@ fn targets(root: &Path) -> Result<Vec<(PathBuf, PathBuf)>, AnalysisError> {
     Ok(targets)
 }
 
-type ParseFailure = (String, Option<&'static str>, String);
-
-fn parse(
-    adapter: &dyn LanguageAdapter,
-    path: &Path,
-    relative: &Path,
-) -> Result<File, ParseFailure> {
+/// Reads and converts one file; a failure becomes the file's error result.
+fn parse(adapter: &dyn LanguageAdapter, path: &Path, relative: &Path) -> Result<File, FileResult> {
     let name = relative.to_string_lossy().replace('\\', "/");
+    let failure = |error: AnalysisError| FileResult::Error {
+        path: name.clone(),
+        language: Some(adapter.language().to_string()),
+        error: error.to_string(),
+    };
     let source = std::fs::read_to_string(path).map_err(|e| {
-        let error = AnalysisError::Io {
+        failure(AnalysisError::Io {
             path: name.clone(),
             message: e.to_string(),
-        };
-        (name.clone(), Some(adapter.language()), error.to_string())
+        })
     })?;
-    adapter
-        .to_ir(&name, &source)
-        .map_err(|e| (name.clone(), Some(adapter.language()), e.to_string()))
+    adapter.to_ir(&name, &source).map_err(failure)
 }
 
 fn run_info(root: &Path, project: String, program: &Program) -> RunInfo {

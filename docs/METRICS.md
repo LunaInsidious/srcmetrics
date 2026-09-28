@@ -27,9 +27,9 @@ Source lines of code.
 | Item | Value |
 |---|---|
 | Definition | Lines occupied by at least one non-comment token. |
-| Scope | file, project |
+| Scope | function, file, project |
 | Input | File source text, Token ranges |
-| Calculation | A token spanning several lines (e.g. a multi-line string) occupies each of them. Project: sum. |
+| Calculation | A token spanning several lines (e.g. a multi-line string) occupies each of them. Function: lines of the function's range (including nested functions). Project: sum. |
 | Unit | lines |
 | Language Applicability | language_independent |
 | Limitations | - |

@@ -8,6 +8,7 @@ mod ecmascript;
 mod go;
 mod java;
 mod python;
+mod rust;
 mod treesitter;
 
 use crate::error::AnalysisError;
@@ -33,6 +34,7 @@ static ADAPTERS: &[TreeSitterAdapter] = &[
     TreeSitterAdapter::new(&ecmascript::JAVASCRIPT),
     TreeSitterAdapter::new(&go::MAPPING),
     TreeSitterAdapter::new(&java::MAPPING),
+    TreeSitterAdapter::new(&rust::MAPPING),
 ];
 
 pub fn adapters() -> impl Iterator<Item = &'static dyn LanguageAdapter> {

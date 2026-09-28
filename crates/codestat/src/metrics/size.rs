@@ -4,8 +4,8 @@
 
 use super::common::{LineClass, is_statement, line_classes};
 use super::{
-    Applicability::*, Calculator, MetricDefinition, MetricValue, Metrics, ProgramMetrics, Scope::*,
-    per_file,
+    Applicability::*, Calculator, FileMetrics, MetricDefinition, MetricValue, Metrics,
+    ProgramMetrics, Scope::*,
 };
 use crate::ir::{File, Function, Program, TokenKind};
 
@@ -32,9 +32,10 @@ static DEFINITIONS: &[MetricDefinition] = &[
         name: "SLOC",
         description: "Source lines of code.",
         definition: "Lines occupied by at least one non-comment token.",
-        scopes: &[File, Project],
+        scopes: &[Function, File, Project],
         input: LINES,
-        calculation: "A token spanning several lines (e.g. a multi-line string) occupies each of them. Project: sum.",
+        calculation: "A token spanning several lines (e.g. a multi-line string) occupies each of them. \
+                      Function: lines of the function's range (including nested functions). Project: sum.",
         unit: "lines",
         applicability: LanguageIndependent,
         limitations: "",
@@ -165,80 +166,89 @@ impl Calculator for SizeCalculator {
     }
 
     fn compute(&self, program: &Program) -> ProgramMetrics {
-        let mut result = per_file(
-            program,
-            |_| (),
-            |file, _| totals(&[file]),
-            |f, _, func| function_metrics(f, func),
-        );
-        let files: Vec<&File> = program.files.iter().collect();
-        result.project = totals(&files);
-        result
+        let classified: Vec<Classified> = program.files.iter().map(|f| (f, classify(f))).collect();
+        let files = classified
+            .iter()
+            .map(|(file, lines)| FileMetrics {
+                metrics: totals(&[(file, lines.clone())]),
+                functions: file
+                    .functions
+                    .iter()
+                    .map(|f| function_metrics(file, lines, f))
+                    .collect(),
+            })
+            .collect();
+        ProgramMetrics {
+            project: totals(&classified),
+            files,
+        }
     }
 }
 
-#[derive(Default)]
-struct LineCounts {
-    loc: usize,
-    sloc: usize,
-    comment: usize,
-    blank: usize,
+/// A file with its line classes, or the reason they are unavailable.
+type Classified<'a> = (&'a File, Result<Vec<LineClass>, String>);
+
+fn classify(file: &File) -> Result<Vec<LineClass>, String> {
+    line_classes(file).map_err(|e| format!("{}: {e}", file.path))
 }
 
-fn line_counts(file: &File) -> Result<LineCounts, String> {
-    let classes = line_classes(file).map_err(|e| format!("{}: {e}", file.path))?;
-    let count = |c: LineClass| classes.iter().filter(|x| **x == c).count();
-    Ok(LineCounts {
-        loc: classes.len(),
-        sloc: count(LineClass::Code),
-        comment: count(LineClass::Comment),
-        blank: count(LineClass::Blank),
-    })
+fn count(lines: &[LineClass], class: LineClass) -> usize {
+    lines.iter().filter(|c| **c == class).count()
 }
 
-/// File or project totals: sums over `files`, with ratios and function statistics recomputed.
-fn totals(files: &[&File]) -> Metrics {
-    let mut m = Metrics::new();
-    let lines = files.iter().try_fold(LineCounts::default(), |acc, f| {
-        let c = line_counts(f)?;
-        Ok::<_, String>(LineCounts {
-            loc: acc.loc + c.loc,
-            sloc: acc.sloc + c.sloc,
-            comment: acc.comment + c.comment,
-            blank: acc.blank + c.blank,
-        })
-    });
-    match lines {
-        Ok(c) => {
-            m.insert("size.loc", c.loc.into());
-            m.insert("size.sloc", c.sloc.into());
-            m.insert("size.comment_loc", c.comment.into());
-            m.insert("size.blank_loc", c.blank.into());
-            m.insert(
-                "size.comment_ratio",
-                MetricValue::ratio(c.comment as f64, c.loc as f64),
-            );
-        }
-        Err(e) => {
-            for id in [
-                "size.loc",
-                "size.sloc",
-                "size.comment_loc",
-                "size.blank_loc",
-                "size.comment_ratio",
-            ] {
-                m.insert(id, MetricValue::Error(e.clone()));
+/// Line metrics summed over files; an error in any file makes them all errors.
+fn line_metrics(files: &[Classified]) -> Metrics {
+    let ids = [
+        "size.loc",
+        "size.sloc",
+        "size.comment_loc",
+        "size.blank_loc",
+    ];
+    let mut sums = [0usize; 4];
+    for (_, lines) in files {
+        match lines {
+            Ok(lines) => {
+                let counts = [
+                    lines.len(),
+                    count(lines, LineClass::Code),
+                    count(lines, LineClass::Comment),
+                    count(lines, LineClass::Blank),
+                ];
+                sums.iter_mut().zip(counts).for_each(|(s, c)| *s += c);
+            }
+            Err(e) => {
+                let error = MetricValue::Error(e.clone());
+                return ids
+                    .iter()
+                    .chain(["size.comment_ratio"].iter())
+                    .map(|id| (*id, error.clone()))
+                    .collect();
             }
         }
     }
+    let mut m: Metrics = ids
+        .iter()
+        .zip(sums)
+        .map(|(id, v)| (*id, v.into()))
+        .collect();
+    m.insert(
+        "size.comment_ratio",
+        MetricValue::ratio(sums[2] as f64, sums[0] as f64),
+    );
+    m
+}
+
+/// File or project totals: sums over `files`, with ratios and function statistics recomputed.
+fn totals(files: &[Classified]) -> Metrics {
+    let mut m = line_metrics(files);
     let statements: usize = files
         .iter()
-        .map(|f| f.nodes.iter().filter(|n| is_statement(n.kind)).count())
+        .map(|(f, _)| f.nodes.iter().filter(|n| is_statement(n.kind)).count())
         .sum();
-    let tokens: usize = files.iter().map(|f| code_tokens(&f.tokens)).sum();
+    let tokens: usize = files.iter().map(|(f, _)| code_tokens(&f.tokens)).sum();
     let lengths: Vec<usize> = files
         .iter()
-        .flat_map(|f| &f.functions)
+        .flat_map(|(f, _)| &f.functions)
         .map(|f| f.range.line_count())
         .collect();
     m.insert("size.statement_count", statements.into());
@@ -249,18 +259,25 @@ fn totals(files: &[&File]) -> Metrics {
     m
 }
 
-fn function_metrics(file: &File, function: &Function) -> Metrics {
+fn function_metrics(
+    file: &File,
+    lines: &Result<Vec<LineClass>, String>,
+    function: &Function,
+) -> Metrics {
     let statements = file
         .descendants_pruned(function.node, |_| false)
         .filter(|n| is_statement(n.kind))
         .count();
+    let r = function.range;
+    let sloc = match lines {
+        Ok(lines) => count(&lines[r.first_line() - 1..r.last_line()], LineClass::Code).into(),
+        Err(e) => MetricValue::Error(e.clone()),
+    };
     Metrics::from([
-        ("size.function_length", function.range.line_count().into()),
+        ("size.function_length", r.line_count().into()),
+        ("size.sloc", sloc),
         ("size.statement_count", statements.into()),
-        (
-            "size.token_count",
-            code_tokens(file.tokens_in(function.range)).into(),
-        ),
+        ("size.token_count", code_tokens(file.tokens_in(r)).into()),
     ])
 }
 
@@ -345,6 +362,7 @@ mod tests {
     fn function_counts() {
         let m = &run(&sample()).files[0].functions[0];
         assert_eq!(m["size.function_length"], v(3.0));
+        assert_eq!(m["size.sloc"], v(3.0));
         assert_eq!(m["size.statement_count"], v(1.0));
         assert_eq!(m["size.token_count"], v(10.0));
     }
