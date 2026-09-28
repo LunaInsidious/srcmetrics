@@ -240,7 +240,7 @@ pub fn fit(
             "all labels are equal; there is nothing to learn".into(),
         ));
     }
-    if !(lambda >= 0.0) {
+    if lambda.is_nan() || lambda < 0.0 {
         return Err(ModelError(format!("lambda must be >= 0, got {lambda}")));
     }
     let names: Vec<&str> = match requested {
@@ -431,12 +431,14 @@ fn solve(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
         }
         a.swap(col, pivot);
         b.swap(col, pivot);
-        for row in col + 1..p {
-            let factor = a[row][col] / a[col][col];
-            for k in col..p {
-                a[row][k] -= factor * a[col][k];
+        let (upper, lower) = a.split_at_mut(col + 1);
+        let pivot_row = &upper[col];
+        for (offset, row) in lower.iter_mut().enumerate() {
+            let factor = row[col] / pivot_row[col];
+            for (value, pivot_value) in row[col..].iter_mut().zip(&pivot_row[col..]) {
+                *value -= factor * pivot_value;
             }
-            b[row] -= factor * b[col];
+            b[col + 1 + offset] -= factor * b[col];
         }
     }
     let mut x = vec![0.0; p];
