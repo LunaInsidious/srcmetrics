@@ -13,6 +13,7 @@ crates/codestat/          コアライブラリ（同期・ネットワーク非
   src/metrics/            Metric Engine（Calculator 群、定義レジストリ）
   src/analyze.rs          解析パイプライン（パス走査 → IR → メトリクス → 結果）
   src/result.rs           解析結果の型（JSON 形式）
+  src/csv.rs              CSV 出力
 crates/codestat-cli/      CLI（clap）
 tests/fixtures/           言語別フィクスチャ
 ```
@@ -56,15 +57,35 @@ analyze(path)
 | language | 拡張子 | grammar |
 |---|---|---|
 | c | .c, .h | tree-sitter-c |
+| cpp | .cpp, .cc, .cxx, .hpp, .hh, .hxx | tree-sitter-cpp |
+| go | .go | tree-sitter-go |
+| java | .java | tree-sitter-java |
+| javascript | .js, .mjs, .cjs, .jsx | tree-sitter-javascript |
 | python | .py | tree-sitter-python |
+| rust | .rs | tree-sitter-rust |
 | typescript | .ts, .mts, .cts | tree-sitter-typescript |
 | tsx | .tsx | tree-sitter-typescript (TSX) |
+
+### Mapping の項目（ADR-0004, 0012, 0013）
+
+| 項目 | 内容 |
+|---|---|
+| kinds | ノード型 → NodeKind（ないものは other） |
+| callee_fields | 呼び出しノードの呼び出し先フィールド（label に呼び出し先名を入れる） |
+| logical_operators | binary を logical にする演算子 |
+| default_case_keyword | default ラベルを示すキーワード（case から除外） |
+| else_field | else 節ノードがない grammar での else 部分のフィールド |
+| comments / literals / interpolations / identifiers | トークン分類。interpolations は literal 内の埋め込みコード |
+| name_fields | 名前を探すフィールドの順序 |
+| decorators | ドキュメントと関数の間に書かれるノード型 |
+| docstring | 関数本体の先頭でドキュメントとなるリテラルのノード型 |
+| ignored_parameters | 引数とみなさないテキスト（C の void 等） |
 
 ### 言語の追加手順
 
 1. grammar クレートを `crates/codestat/Cargo.toml` に追加（ADR に記録）
 2. `src/lang/<lang>.rs` に `Mapping` を書き、`src/lang/mod.rs` の `ADAPTERS` に登録
-3. `tests/fixtures/equivalence/classify.<ext>` を追加し、`tests/engine.rs` の等価テストに加える
+3. `tests/fixtures/equivalence/classify.<ext>` を追加し、`tests/engine.rs` の `EQUIVALENCE_LANGUAGES` に加える（Cyclomatic / Cognitive / Max Nesting が全言語で一致すること）
 
 Metric Engine は変更しない。
 
@@ -74,7 +95,7 @@ Metric Engine は変更しない。
 - `metrics::compute` が全 Calculator を実行し、スコープごとの `Metrics`（id → `MetricValue`、id 順）を併合する。
 - `MetricValue = Available(f64) | NotApplicable | Unsupported | Error(String)`（ADR-0005）。
 - 定義は各 Calculator の `DEFINITIONS` に PLAN §9 の全項目で記述し、`docs/METRICS.md` はそこから生成する（`tests/docs.rs` で同期を検査）。
-- 定義や計算方法を変えたら `DEFINITION_VERSION` を上げる。
+- 定義や計算方法を変えたら `DEFINITION_VERSION` を上げる。初回リリースまでの開発中は `0.1.0` のまま（公開済みの解析結果がないため）。
 
 ### 実装済み Calculator
 
@@ -82,10 +103,29 @@ Metric Engine は変更しない。
 |---|---|
 | SizeCalculator | size.loc, sloc, comment_loc, blank_loc, comment_ratio, statement_count, token_count, function_count, function_length, avg_function_length, max_function_length |
 | ComplexityCalculator | complexity.cyclomatic, branch_count, conditional_count, loop_count, return_count, jump_count, path_count |
+| CognitiveCalculator | complexity.cognitive |
 | NestingCalculator | nesting.max_depth, nesting.avg_depth |
 | HalsteadCalculator | halstead.unique_operators, unique_operands, total_operators, total_operands, vocabulary, length, volume, difficulty, effort, time, bugs |
 | FunctionCalculator | function.parameter_count, avg_parameter_count, max_parameter_count, expression_count, call_count |
 | DuplicationCalculator | duplication.duplicate_block_count, duplicate_token_count, duplication_ratio, max_duplicate_length |
+| DependencyCalculator | dependency.fan_in, fan_out, call_depth, dependency_count |
+| DocumentationCalculator | documentation.doc_loc, documented_function_count, documentation_ratio |
+
+### 派生メトリクス（ADR-0015）
+
+全 Calculator の結果を併合した後、各スコープの表に `derived.rs` の派生メトリクスを追加する。派生メトリクスは IR を見ず、標準メトリクスの値だけから計算する。
+
+| ID | 式 | スコープ |
+|---|---|---|
+| maintainability.index | 171 − 5.2·ln(V) − 0.23·CC − 16.2·ln(SLOC) | function, file |
+| derived.cyclomatic_per_function | cyclomatic / function_count | file, project |
+| derived.tokens_per_loc | token_count / loc | file, project |
+| derived.statements_per_function | statement_count / function_count | file, project |
+| derived.duplicate_tokens_per_sloc | duplicate_token_count / sloc | file, project |
+
+### 計算量
+
+深い構造（数千段の `else if` の連鎖、長い呼び出しの連鎖）でもスタックを溢れさせないよう、再帰は使わない。ネストのレベルと経路数は arena の前順（親が先）を使って 1 回の走査で計算し、Call Depth は反復版の Tarjan 法で強連結成分をまとめて計算する。
 
 ### メトリクスの追加手順
 
@@ -105,7 +145,7 @@ Metric Engine は変更しない。
 ## 7. CLI
 
 ```text
-codestat analyze <PATH> [--project NAME] [-o FILE]   解析結果を JSON で出力
+codestat analyze <PATH> [--project NAME] [-o FILE] [--format json|csv]   解析結果を出力（CSV は ADR-0016）
 codestat metrics [--format json|markdown]            メトリクス定義を出力（markdown は docs/METRICS.md と同一）
 ```
 
