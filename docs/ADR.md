@@ -119,3 +119,372 @@
 |---|---|---|
 | YYYY-MM-DD | Proposed | Initial proposal |
 | | | |
+---
+
+# ADR 一覧
+
+上記はテンプレート。以下に採番済み ADR を記録する。
+
+---
+
+# ADR-0001: 実装言語 Rust と Cargo workspace 構成
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** architecture, language
+
+## Context
+
+### Problem
+
+PLAN.md は Parser の実装技術を固定していない（§5.1）。実装言語とパッケージ構成を決める必要がある。
+
+### Requirements
+
+- 大規模コードベースを解析可能（§13.3）
+- オフライン実行（§13.2）
+- Parser / IR / Metric Engine を独立してテスト可能（§13.4）
+- Phase 4 の API/UI をコア解析エンジンから分離できること
+
+## Decision
+
+Rust で実装し、Cargo workspace を以下の 2 クレートで構成する。
+
+```text
+crates/codestat      コアライブラリ（IR, Language Adapter, Metric Engine, 出力, 統計, モデル, レポート）
+crates/codestat-cli  CLI バイナリ（引数解析, HTTP サーバ）
+```
+
+### Rationale
+
+- tree-sitter（ADR-0002）の本体が Rust/C であり、バインディングの追加コストがない
+- ネイティブ実行で大規模コードベースに対応しやすい
+- コアをライブラリとして分けることで、CLI 固有・非同期ランタイム依存（HTTP サーバ）をコアに持ち込まない
+
+## Alternatives Considered
+
+### Python + py-tree-sitter
+
+**Pros** 実装量が少ない、統計ライブラリが豊富
+**Cons** 大規模解析で遅い、配布時に環境依存が大きい
+**Rejected because:** ユーザー指定が Rust であり、性能面でも Rust が有利
+
+### 単一クレート
+
+**Pros** 構成が単純
+**Cons** HTTP サーバ用の非同期依存がコアライブラリに入る
+**Rejected because:** Metric Engine の独立性（§13.4）を依存関係のレベルで保てない
+
+## Consequences
+
+### Positive
+- コアは同期・ネットワーク非依存のまま保てる
+
+### Negative
+- ビルド時間が長い（tree-sitter grammar の C コンパイル）
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0002: Parser に tree-sitter を採用
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** parser
+
+## Context
+
+### Problem
+
+8 言語（§4）の構文木を得る手段が必要。
+
+### Requirements
+
+- 複数言語に同一 API で対応
+- 構文木から共通 IR を生成できる
+- 同一入力に同一結果（§13.1）、オフライン（§13.2）
+
+## Decision
+
+`tree-sitter` クレートと各言語の公式 grammar クレート（`tree-sitter-c`, `-python`, `-typescript` など）を使う。
+
+### Rationale
+
+- 全対象言語の grammar が同一 API（`Node::kind()`, フィールド名）で提供される
+- 具象構文木の全トークン（匿名ノード含む）を取れるため Token / Halstead 計算に使える
+- grammar はクレートのバージョンで固定されるので再現性を確保できる（Parser Version として出力、§17）
+
+## Alternatives Considered
+
+### 言語ごとの専用パーサ（syn, rustpython-parser, swc 等）
+
+**Pros** 言語ごとに精度が高い
+**Cons** 言語ごとに API が全く異なり、Adapter の実装量が言語数に比例して大きくなる
+**Rejected because:** 言語追加のコスト（§12.1）が大きい
+
+### 自作の軽量トークナイザ（lizard 方式）
+
+**Pros** 依存が少ない
+**Cons** ネスト・関数境界の判定精度が低い、言語ごとの手書き規則が増える
+**Rejected because:** 構造メトリクス（ネスト、関数）の精度を確保できない
+
+## Consequences
+
+### Negative
+- grammar ごとにノード種名・構造が異なるため、Mapping（ADR-0004）で吸収する必要がある
+- tree-sitter はエラー回復を行うため、ERROR ノードの扱いを決める必要がある（ADR-0005）
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0003: Common IR の設計
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** IR
+
+## Context
+
+### Problem
+
+PLAN §7 の IR 要件（Program / File / Function / Parameter / Node / Token / SourceRange）を具体的なデータ構造にする必要がある。
+また、言語非依存にメトリクスを計算するには §7.2 の Node 種別だけでは足りないものがある。
+
+## Decision
+
+### Details
+
+```text
+Program  { files: Vec<File> }
+File     { path, language, source, nodes: Vec<Node>, root: NodeId, tokens: Vec<Token>, functions: Vec<Function> }
+Node     { id: NodeId, kind: NodeKind, parent: Option<NodeId>, children: Vec<NodeId>, range: SourceRange }
+Function { id: FunctionId, name: Option<String>, parameters: Vec<Parameter>, node: NodeId, body: Option<NodeId>, range, doc: Option<SourceRange> }
+Parameter{ name: Option<String>, range }
+Token    { kind: TokenKind, text, range }
+SourceRange { start: Position, end: Position }
+Position { line (1 始まり), column (0 始まり, バイト単位), offset (バイト) }
+```
+
+- Node は File 内の配列（arena）に格納し、`NodeId` = 添字で parent / children を参照する。
+- File は元のソーステキストを保持する（空行判定に使う）。
+- NodeKind は §7.2 に以下を追加する（§7.2「必要に応じて追加可能」に基づく）。
+  - `function`：関数の境界。関数単位メトリクスで入れ子関数を除外するために必要
+  - `else`：else 節。else-if 連鎖をネストと区別するために必要
+  - `logical`：短絡論理演算（&&, ||, and, or）。Cyclomatic の判定点
+  - `conditional`：三項演算子。Cyclomatic の判定点
+  - `catch`：例外捕捉節。Cyclomatic / ネストの判定点
+  - `import`：import / include。Dependency Count に使う
+- TokenKind は `keyword, identifier, literal, operator, punctuation, comment` とする。
+  - §7.5 の `operand` はトークンの種別ではなく Halstead 上の分類なので、identifier と literal から導出する（Phase 2 で ADR 化）
+  - §7.5 の `whitespace` はトークン化しない。空行は File のソーステキストから判定する
+- Function に `doc`（ドキュメントコメントの範囲）を追加する（§7.4「少なくとも」に基づく）。Documentation Metrics で使う。
+- 無名関数（ラムダ等）は `name: None`。
+
+### Rationale
+
+- arena 形式は参照循環を作らずに parent を持てる。Rust で扱いやすく、走査も速い
+- 追加した種別はどれも「複数言語に共通して存在する概念」で、特定言語の概念ではない（§6.2）
+- IR は完全な AST を目指さない（§19-3）。tree-sitter の名前付きノードのうち、Mapping にないものは `other` にする
+
+## Alternatives Considered
+
+### Rc<RefCell<Node>> による木構造
+**Cons** parent 参照に Weak が必要で冗長、借用エラーが実行時になる
+**Rejected because:** arena の方が単純
+
+### Mapping にないノードを IR に含めない（子を親に繋ぎ替える）
+**Pros** ノード数が減る
+**Cons** 構造が変わるため、ネスト計算の根拠が追いにくくなる
+**Rejected because:** §7.2 に `other` があり、構造を保つ方が単純
+
+## Consequences
+
+### Negative
+- NodeKind を増やすたびに全言語の Mapping を見直す必要がある
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0004: Language Adapter は汎用変換器と言語別の宣言的 Mapping で構成する
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** adapter, parser
+
+## Context
+
+### Problem
+
+言語ごとに Adapter を手書きすると、同じ走査ロジックが言語数分だけ重複する。
+§12.1 は「言語追加時は Parser / Adapter / Mapping のみ変更」を求めている。
+
+## Decision
+
+`LanguageAdapter` trait（`language()`, `extensions()`, `to_ir(path, source)`）を定義する。実装は tree-sitter 用の汎用変換器 1 つとし、言語ごとの差分は静的な `Mapping` テーブルだけで表現する。
+
+```text
+Mapping {
+  language, extensions, grammar,
+  kinds:       &[(tree-sitter ノード種名, NodeKind)]   // 載っていない名前付きノードは other
+  comments:    &[ノード種名]                           // comment トークンとして扱う
+  literals:    &[ノード種名]                           // 丸ごと 1 つの literal トークンとして扱う（文字列等）
+  identifiers: &[ノード種名]                           // identifier トークンとして扱う
+  ignored_parameters: &[テキスト]                      // 例: C の f(void)
+}
+```
+
+関数の名前・引数・本体は、以下の汎用規則で取り出す。
+
+- 名前：フィールド `name` を辿る。なければフィールド `declarator` を再帰的に辿り、最初の identifier を名前にする
+- 引数：フィールド `parameters` を同様に探し、その名前付き子ノード（コメントを除く）を引数とする
+- 本体：フィールド `body`
+
+Token は具象構文木の葉（comment / literal は部分木ごと）から作り、以下の汎用規則で分類する。
+
+1. `comments` に載っている → comment
+2. `literals` に載っている → literal
+3. `identifiers` に載っている → identifier
+4. テキストが英字または `_` で始まる → keyword
+5. 区切り記号（`, ; ( ) [ ] { }`）→ punctuation
+6. それ以外 → operator
+
+### Rationale
+
+- 言語固有の知識はテーブル上のデータに集まり、コード上の分岐にならない（§6.2, §19-1）
+- 言語追加 ＝ テーブル追加となり、変換器と Metric Engine は変わらない（§12.1）
+- Mapping のテストはフィクスチャで言語ごとに書ける
+
+## Alternatives Considered
+
+### 言語ごとに Adapter を手書き
+**Pros** 言語固有の例外を自由に書ける
+**Cons** 走査・トークン化のコードが言語数分重複する
+**Rejected because:** 重複と、言語ごとの振る舞いの差が生まれやすい
+
+### tree-sitter のクエリ（.scm）で抽出
+**Pros** 宣言的
+**Cons** クエリ言語とその文法差の理解が別途必要。NodeKind の対応だけなら表で足りる
+**Rejected because:** 表で表現できる範囲に対してオーバースペック
+
+## Consequences
+
+### Negative
+- 汎用規則で表現できない言語の癖が見つかった場合、Mapping の項目追加が必要になる。追加するときは MEMO / ADR に記録する
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0005: メトリクス値の表現とエラー分類
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** metrics, error
+
+## Context
+
+### Problem
+
+§14, §15 は「計算不能」と「値 0」の区別、エラーの種類の区別を求めている。
+
+## Decision
+
+- メトリクス値：`MetricValue = Available(f64) | NotApplicable | Unsupported | Error(String)`
+  - 例：関数が 0 個のファイルの「平均関数長」は `NotApplicable`
+- 解析エラー：`AnalysisError = Parse | UnsupportedSyntax | UnsupportedLanguageFeature | IrConversion`（§14）
+  - 構文木に ERROR / MISSING ノードがある場合は、位置を添えて `Parse` エラーとする。回復結果から部分的なメトリクスは出さない
+  - 対応していない拡張子は `UnsupportedLanguage` エラーとする（言語を推測しない）
+- プロジェクト（ディレクトリ）解析では、失敗したファイルを `status: error` と理由付きで結果に記録し、他のファイルの解析は続ける
+- JSON 出力では `metrics: {id: number | null}` と `unavailable: {id: "not_applicable" | "unsupported" | "error: ..."}` を併記する
+
+### Rationale
+
+- 列挙型にすると、0 と未計算の混同が型の上で起きない
+- 部分的に壊れた構文木から出した値は再現性・妥当性を保証できないため、エラーとして明示する
+- ファイル単位のエラーを記録して継続するのは「隠蔽」ではなく、結果の中で失敗が明示されるため許容する
+
+## Alternatives Considered
+
+### Option<f64>
+**Cons** not_applicable / unsupported / error を区別できない（§15 違反）
+**Rejected because:** 要件を満たさない
+
+### ERROR ノードを含んでいても解析を続ける
+**Pros** 多少壊れたコードでも値が出る
+**Cons** 値の意味が保証できず、失敗が成功に見える
+**Rejected because:** 不要なフォールバックになる
+
+## Consequences
+
+### Negative
+- tree-sitter grammar が未対応の新しい構文を含むファイルは解析できない。その場合はエラーメッセージで位置と原因を示す
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
+
+---
+
+# ADR-0006: 依存クレートの方針
+
+- **Status:** Accepted
+- **Date:** 2026-09-29
+- **Deciders:** lunaInsidious, Claude
+- **Tags:** dependencies
+
+## Context
+
+### Problem
+
+AGENTS.md は「便利そう」という理由での依存追加を禁止している。採用基準を決める必要がある。
+
+## Decision
+
+依存は「要件を満たすのに必要で、自前実装が不合理に大きいもの」に限る。以下を採用する。
+
+| クレート | 用途 | 根拠 |
+|---|---|---|
+| tree-sitter, tree-sitter-<lang> | 構文解析 | ADR-0002 |
+| serde, serde_json | JSON 出力（§11 必須） | JSON のエスケープ・直列化を自前で書く理由がない |
+| clap（CLI クレートのみ） | サブコマンド・引数解析 | サブコマンドが 5 つ以上あり、手書きのヘルプ・エラー処理は大きい |
+| ignore | ディレクトリ走査 | .gitignore を尊重しないと target/ や node_modules を解析してしまう（§13.3） |
+| time | タイムスタンプの RFC 3339 形式（§17） | 暦計算を自前で書かない |
+
+採用しないもの：
+
+- thiserror / anyhow：エラー型は少数で、std の `Error` 実装で足りる
+- 数値計算ライブラリ（Phase 4）：必要な統計・回帰は小規模で、自前実装が小さい（Phase 4 で改めて ADR 化）
+
+Phase 2 以降で追加する依存（csv, axum, tokio 等）は、そのときに個別の ADR を書く。
+
+## Revision History
+
+| Date | Status | Change |
+|---|---|---|
+| 2026-09-29 | Accepted | Initial |
