@@ -19,7 +19,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Analyze a file or directory and print the result as JSON.
+    /// Analyze a file or directory and print the result.
     Analyze {
         /// File or directory to analyze. Directories are walked respecting .gitignore.
         path: PathBuf,
@@ -29,12 +29,21 @@ enum Command {
         /// Write the result to this file instead of stdout.
         #[arg(long, short)]
         output: Option<PathBuf>,
+        /// JSON has every value and the reason for each null; CSV has one row per project/file/function.
+        #[arg(long, value_enum, default_value_t = ResultFormat::Json)]
+        format: ResultFormat,
     },
     /// List the metric definitions.
     Metrics {
         #[arg(long, value_enum, default_value_t = DefinitionFormat::Json)]
         format: DefinitionFormat,
     },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum ResultFormat {
+    Json,
+    Csv,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -59,10 +68,15 @@ fn run(command: Command) -> Result<(), String> {
             path,
             project,
             output,
+            format,
         } => {
             let result = analyze(&path, project.as_deref()).map_err(|e| e.to_string())?;
             warn_failed_files(&result);
-            write(output, &to_json(&result)?)
+            let text = match format {
+                ResultFormat::Json => to_json(&result)?,
+                ResultFormat::Csv => codestat::csv::to_csv(&result),
+            };
+            write(output, &text)
         }
         Command::Metrics { format } => {
             let definitions = metrics::definitions();

@@ -106,3 +106,16 @@ fn metrics_markdown_matches_the_definition_document() {
     .unwrap();
     assert_eq!(String::from_utf8(output.stdout).unwrap(), doc);
 }
+
+#[test]
+fn analyze_can_print_csv() {
+    let output = codestat(&["analyze", &fixture("mixed"), "--format", "csv"]);
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.starts_with("scope,path,language,function,start_line,end_line,status,error,"));
+    assert!(
+        text.lines()
+            .any(|l| l.starts_with("function,ok.py,python,ok,1,2,ok,")),
+        "{text}"
+    );
+}
