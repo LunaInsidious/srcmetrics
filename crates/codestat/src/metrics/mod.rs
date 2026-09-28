@@ -3,6 +3,7 @@
 mod common;
 mod complexity;
 mod definition;
+mod function;
 mod halstead;
 mod nesting;
 mod size;
@@ -113,6 +114,7 @@ pub fn calculators() -> Vec<Box<dyn Calculator>> {
         Box::new(complexity::ComplexityCalculator),
         Box::new(nesting::NestingCalculator),
         Box::new(halstead::HalsteadCalculator),
+        Box::new(function::FunctionCalculator),
     ]
 }
 

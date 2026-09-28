@@ -470,3 +470,78 @@ B.
 | Limitations | Keywords, including type keywords such as `int`, are operators. A string literal is one operand. |
 | Reference | Halstead, M. H. (1977). Elements of Software Science. Elsevier. |
 
+## `function.parameter_count` — Parameter Count
+
+Number of declared parameters.
+
+| Item | Value |
+|---|---|
+| Definition | Parameters of the function in the IR. |
+| Scope | function |
+| Input | Function parameters |
+| Calculation | Variadic parameters (e.g. `*args`) count as one. Separators such as Python `*` and `/` and C `(void)` are not parameters. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Explicit receivers (Python `self`) count; implicit ones (`this`) do not. |
+| Reference | - |
+
+## `function.avg_parameter_count` — Average Parameter Count
+
+Mean Parameter Count over functions.
+
+| Item | Value |
+|---|---|
+| Definition | Mean of function.parameter_count. |
+| Scope | file, project |
+| Input | Function parameters |
+| Calculation | not_applicable when there are no functions. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | See function.parameter_count. |
+| Reference | - |
+
+## `function.max_parameter_count` — Maximum Parameter Count
+
+Largest Parameter Count over functions.
+
+| Item | Value |
+|---|---|
+| Definition | Maximum of function.parameter_count. |
+| Scope | file, project |
+| Input | Function parameters |
+| Calculation | not_applicable when there are no functions. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | See function.parameter_count. |
+| Reference | - |
+
+## `function.expression_count` — Expression Count
+
+Number of expressions, including sub-expressions.
+
+| Item | Value |
+|---|---|
+| Definition | Nodes of kind expression, call, assignment, binary, logical, conditional or unary. |
+| Scope | function, file, project |
+| Input | Node kinds |
+| Calculation | Function: excluding nested functions. File: the whole file. Project: sum. Identifiers and literals are not expressions on their own. |
+| Unit | count |
+| Language Applicability | partially_language_dependent |
+| Limitations | Expression forms not listed in a language Mapping (e.g. lambdas' bodies are nested functions; unmapped expression types are `other`) are not counted. |
+| Reference | - |
+
+## `function.call_count` — Call Count
+
+Number of call sites.
+
+| Item | Value |
+|---|---|
+| Definition | Nodes of kind call (function calls and constructor calls). |
+| Scope | function, file, project |
+| Input | Node kinds |
+| Calculation | Function: excluding nested functions. File: the whole file. Project: sum. |
+| Unit | count |
+| Language Applicability | language_independent |
+| Limitations | - |
+| Reference | - |
+
