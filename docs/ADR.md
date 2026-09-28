@@ -790,12 +790,12 @@ Nejmeh の NPATH は「条件式」と「then / else の本体」を区別して
 
 ## Consequences
 
+### Negative
+- 短絡演算子による経路は数えない。三項演算子の 2 つの値の経路数は区別しない（子の積 ＋ 1 で近似）
+
 ## Implementation Notes
 
 - 経路数は arena の逆順（子が先）に 1 回走査して全ノード分を計算する。再帰しないので、深い `else if` の連鎖でもスタックを溢れさせない（Phase 2 レビュー指摘）
-
-### Negative
-- 短絡演算子による経路は数えない。三項演算子の 2 つの値の経路数は区別しない（子の積 ＋ 1 で近似）
 
 ## Revision History
 
