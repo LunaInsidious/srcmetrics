@@ -27,6 +27,35 @@ pub fn analyze(root: &Path, project: Option<&str>) -> Result<AnalysisResult, Ana
             Err(failure) => failures.push(failure),
         }
     }
+    let dir = if root.is_dir() {
+        root
+    } else {
+        root.parent().expect("a canonical file path has a parent")
+    };
+    let run = run_info(
+        project,
+        git(dir, &["remote", "get-url", "origin"]),
+        git(dir, &["rev-parse", "HEAD"]),
+        &program,
+    );
+    Ok(assemble(program, failures, run))
+}
+
+/// Analyzes source text given with its file name (whose extension selects the language),
+/// without reading the file system. A parse failure is an error, since it is the only file.
+pub fn analyze_source(filename: &str, source: &str) -> Result<AnalysisResult, AnalysisError> {
+    let file = adapter_for_path(filename)?.to_ir(filename, source)?;
+    let stem = Path::new(filename)
+        .file_stem()
+        .expect("a file name with a supported extension has a stem");
+    let project = stem.to_string_lossy().into_owned();
+    let program = Program { files: vec![file] };
+    let run = run_info(project, None, None, &program);
+    Ok(assemble(program, vec![], run))
+}
+
+/// Computes the metrics of `program` and builds the result; files are sorted by path.
+fn assemble(program: Program, failures: Vec<FileResult>, run: RunInfo) -> AnalysisResult {
     let computed = metrics::compute(&program);
     let mut files: Vec<FileResult> = program
         .files
@@ -36,11 +65,11 @@ pub fn analyze(root: &Path, project: Option<&str>) -> Result<AnalysisResult, Ana
         .collect();
     files.extend(failures);
     files.sort_by(|a, b| a.path().cmp(b.path()));
-    Ok(AnalysisResult {
-        run: run_info(root, project, &program),
+    AnalysisResult {
+        run,
         project: MetricsOutput::from(&computed.project),
         files,
-    })
+    }
 }
 
 fn file_result(file: &File, metrics: &FileMetrics) -> FileResult {
@@ -114,12 +143,12 @@ fn parse(adapter: &dyn LanguageAdapter, path: &Path, relative: &Path) -> Result<
     adapter.to_ir(&name, &source).map_err(failure)
 }
 
-fn run_info(root: &Path, project: String, program: &Program) -> RunInfo {
-    let dir = if root.is_dir() {
-        root
-    } else {
-        root.parent().expect("a canonical file path has a parent")
-    };
+fn run_info(
+    project: String,
+    repository: Option<String>,
+    commit: Option<String>,
+    program: &Program,
+) -> RunInfo {
     let parsers: BTreeMap<String, String> = program
         .files
         .iter()
@@ -132,8 +161,8 @@ fn run_info(root: &Path, project: String, program: &Program) -> RunInfo {
         .collect();
     RunInfo {
         project,
-        repository: git(dir, &["remote", "get-url", "origin"]),
-        commit: git(dir, &["rev-parse", "HEAD"]),
+        repository,
+        commit,
         tool_version: env!("CARGO_PKG_VERSION").to_string(),
         metric_definition_version: DEFINITION_VERSION.to_string(),
         parsers,

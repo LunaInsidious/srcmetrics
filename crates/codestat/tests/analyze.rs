@@ -132,3 +132,21 @@ fn result_round_trips_through_json() {
     assert_eq!(value["files"][0]["status"], "error");
     assert_eq!(value["files"][1]["status"], "ok");
 }
+
+#[test]
+fn source_text_can_be_analyzed_without_the_file_system() {
+    let result =
+        codestat::analyze::analyze_source("snippet.py", "def f(a):\n    return a\n").unwrap();
+    assert_eq!(paths(&result.files), vec!["snippet.py"]);
+    assert_eq!(result.run.project, "snippet");
+    assert_eq!(
+        (
+            result.run.repository.as_deref(),
+            result.run.commit.as_deref()
+        ),
+        (None, None)
+    );
+    assert_eq!(result.project.metrics["size.function_count"], Some(1.0));
+    let err = codestat::analyze::analyze_source("broken.py", "def (:\n").unwrap_err();
+    assert!(matches!(err, AnalysisError::Parse { .. }), "{err:?}");
+}
