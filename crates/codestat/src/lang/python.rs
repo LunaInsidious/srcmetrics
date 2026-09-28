@@ -55,6 +55,7 @@ pub static MAPPING: Mapping = Mapping {
         ("function_definition", Function),
         ("lambda", Function),
     ],
+    callee_fields: &["function"],
     logical_operators: &[],
     else_field: None,
     default_case_keyword: None,

@@ -419,3 +419,64 @@ fn cpp_methods_qualified_names_lambdas_and_catch() {
     assert_eq!(count(&file, 2, NodeKind::Loop), 1);
     assert_eq!(count(&file, 2, NodeKind::Catch), 1);
 }
+
+fn labels(file: &File, kind: NodeKind) -> Vec<String> {
+    file.nodes
+        .iter()
+        .filter(|n| n.kind == kind)
+        .map(|n| n.label.clone().unwrap_or_default())
+        .collect()
+}
+
+#[test]
+fn calls_are_labelled_with_the_callee_name() {
+    let cases = [
+        (
+            "a.c",
+            "void f() { g(1); s.h(); p->k(); }\n",
+            vec!["g", "h", "k"],
+        ),
+        ("a.py", "def f():\n    g(1)\n    a.b.h()\n", vec!["g", "h"]),
+        (
+            "a.ts",
+            "function f() { g(1); a.b.h(); new K(); }\n",
+            vec!["g", "h", "K"],
+        ),
+        ("a.js", "function f() { g(1); a.h(); }\n", vec!["g", "h"]),
+        (
+            "a.go",
+            "package p\nfunc f() { g(1); fmt.Println() }\n",
+            vec!["g", "Println"],
+        ),
+        (
+            "A.java",
+            "class A { void f() { g(1); a.h(); new K(); } }\n",
+            vec!["g", "h", "K"],
+        ),
+        (
+            "a.rs",
+            "fn f() { g(1); a.h(); println!(\"x\"); }\n",
+            vec!["g", "h", "println"],
+        ),
+        (
+            "a.cpp",
+            "void f() { g(1); std::sort(v); a.h(); new K(); }\n",
+            vec!["g", "sort", "h", "K"],
+        ),
+    ];
+    for (path, source, expected) in cases {
+        assert_eq!(
+            labels(&parse_str(path, source), NodeKind::Call),
+            expected,
+            "{path}"
+        );
+    }
+}
+
+#[test]
+fn logical_nodes_are_labelled_with_the_operator() {
+    let file = parse_str("a.py", "x = a and b or c\n");
+    assert_eq!(labels(&file, NodeKind::Logical), vec!["or", "and"]);
+    let file = parse_str("a.c", "int x = a && b || c;\n");
+    assert_eq!(labels(&file, NodeKind::Logical), vec!["||", "&&"]);
+}

@@ -45,6 +45,7 @@ pub static MAPPING: Mapping = Mapping {
         ("preproc_include", Import),
         ("function_definition", Function),
     ],
+    callee_fields: &["function"],
     logical_operators: &["&&", "||"],
     else_field: None,
     default_case_keyword: Some("default"),

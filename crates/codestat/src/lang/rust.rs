@@ -43,6 +43,7 @@ pub static MAPPING: Mapping = Mapping {
         ("function_item", Function),
         ("closure_expression", Function),
     ],
+    callee_fields: &["function", "macro"],
     logical_operators: &["&&", "||"],
     default_case_keyword: None,
     else_field: None,

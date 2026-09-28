@@ -77,6 +77,7 @@ pub static TYPESCRIPT: Mapping = Mapping {
     grammar: || tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
     grammar_crate: ("tree-sitter-typescript", "0.23.2"),
     kinds: KINDS,
+    callee_fields: &["function", "constructor"],
     logical_operators: &["&&", "||"],
     else_field: None,
     default_case_keyword: None,

@@ -55,6 +55,7 @@ pub static MAPPING: Mapping = Mapping {
         ("compact_constructor_declaration", Function),
         ("lambda_expression", Function),
     ],
+    callee_fields: &["name", "type"],
     logical_operators: &["&&", "||"],
     default_case_keyword: Some("default"),
     else_field: Some("alternative"),

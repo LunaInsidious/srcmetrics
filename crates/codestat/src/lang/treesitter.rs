@@ -19,6 +19,8 @@ pub struct Mapping {
     pub grammar_crate: (&'static str, &'static str),
     /// tree-sitter node type -> IR node kind. Unlisted named nodes become `Other`.
     pub kinds: &'static [(&'static str, NodeKind)],
+    /// Fields of a call node holding the callee, tried in order (ADR-0012).
+    pub callee_fields: &'static [&'static str],
     /// Operators that turn a `Binary` node into a `Logical` (short-circuit) node.
     pub logical_operators: &'static [&'static str],
     /// Keyword that marks a `Case` node as the default label (not a decision point).
@@ -198,12 +200,20 @@ impl<'a> Converter<'a> {
         {
             kind = NodeKind::Else;
         }
+        let label = match kind {
+            NodeKind::Call => self.callee_name(ts),
+            NodeKind::Logical => ts
+                .child_by_field_name("operator")
+                .map(|op| self.text(op).to_string()),
+            _ => None,
+        };
         self.nodes.push(Node {
             id,
             kind,
             parent,
             children: vec![],
             range: range(ts),
+            label,
         });
         if let Some(p) = parent {
             self.nodes[p.0].children.push(id);
@@ -225,6 +235,26 @@ impl<'a> Converter<'a> {
             NodeKind::Case if self.is_default_case(ts) => NodeKind::Other,
             k => k,
         }
+    }
+
+    /// The last identifier leaf of the callee (`f(x)` -> f, `a.b.c()` -> c, `std::sort()` -> sort).
+    fn callee_name(&self, call: tree_sitter::Node) -> Option<String> {
+        let callee = self
+            .mapping
+            .callee_fields
+            .iter()
+            .find_map(|f| call.child_by_field_name(f))?;
+        let mut cursor = callee.walk();
+        let mut last = None;
+        let mut stack = vec![callee];
+        while let Some(n) = stack.pop() {
+            if n.child_count() == 0 && self.is_identifier(&n) {
+                last = Some(n);
+            }
+            let children: Vec<_> = n.children(&mut cursor).collect();
+            stack.extend(children.into_iter().rev());
+        }
+        last.map(|n| self.text(n).to_string())
     }
 
     fn is_logical(&self, ts: tree_sitter::Node) -> bool {

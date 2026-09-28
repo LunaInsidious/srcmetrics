@@ -56,6 +56,9 @@ pub struct Node {
     pub parent: Option<NodeId>,
     pub children: Vec<NodeId>,
     pub range: SourceRange,
+    /// Kind-specific label (ADR-0012): the callee name of a `Call`, the operator of a `Logical`.
+    /// `None` for other kinds, and when the callee has no name (e.g. `f()()`).
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -226,6 +229,7 @@ pub mod builder {
                 parent: None,
                 children: vec![],
                 range: lines(1, source.lines().count().max(1)),
+                label: None,
             };
             FileBuilder {
                 file: File {
@@ -257,8 +261,15 @@ pub mod builder {
                 parent: Some(parent),
                 children: vec![],
                 range,
+                label: None,
             });
             self.file.nodes[parent.0].children.push(id);
+            id
+        }
+
+        pub fn labelled(&mut self, parent: NodeId, kind: NodeKind, label: &str) -> NodeId {
+            let id = self.node(parent, kind);
+            self.file.nodes[id.0].label = Some(label.into());
             id
         }
 

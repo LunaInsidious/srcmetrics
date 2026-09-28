@@ -270,7 +270,7 @@ PLAN §7 の IR 要件（Program / File / Function / Parameter / Node / Token / 
 ```text
 Program  { files: Vec<File> }
 File     { path, language, source, nodes: Vec<Node>, root: NodeId, tokens: Vec<Token>, functions: Vec<Function> }
-Node     { id: NodeId, kind: NodeKind, parent: Option<NodeId>, children: Vec<NodeId>, range: SourceRange }
+Node     { id: NodeId, kind: NodeKind, parent: Option<NodeId>, children: Vec<NodeId>, range: SourceRange, label: Option<String> }
 Function { id: FunctionId, name: Option<String>, parameters: Vec<Parameter>, node: NodeId, body: Option<NodeId>, range, doc: Option<SourceRange> }
 Parameter{ name: Option<String>, range }
 Token    { kind: TokenKind, text, range }
@@ -278,7 +278,8 @@ SourceRange { start: Position, end: Position }
 Position { line (1 始まり), column (0 始まり, バイト単位), offset (バイト) }
 ```
 
-- Node は File 内の配列（arena）に格納し、`NodeId` = 添字で parent / children を参照する。
+- Node は File 内の配列（arena）に前順（親が子より先）で格納し、`NodeId` = 添字で parent / children を参照する。
+- `label` は種別ごとの付加情報（`call` の呼び出し先名、`logical` の演算子。ADR-0012）。
 - File は元のソーステキストを保持する（空行判定に使う）。
 - NodeKind は §7.2 に以下を追加する（§7.2「必要に応じて追加可能」に基づく）。
   - `function`：関数の境界。関数単位メトリクスで入れ子関数を除外するために必要
@@ -320,6 +321,7 @@ Position { line (1 始まり), column (0 始まり, バイト単位), offset (�
 | Date | Status | Change |
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
+| 2026-09-29 | Accepted | Node に `label` を追加（ADR-0012）。arena が前順であることを明記 |
 
 ---
 
@@ -361,7 +363,7 @@ Mapping {
 - 本体：フィールド `body`
 - 1 つの引数宣言に `name` フィールドが複数ある場合（Go の `a, b int`）は、名前ごとに 1 つの引数とする
 - else 節のノードがない grammar（Go, Java）：Mapping の `else_field`（`alternative`）にある子で、それ自体が `branch` でないものを `else` とする
-- Mapping の追加項目：`logical_operators`（`binary` ノードの `operator` フィールドがこれに一致すれば `logical`）、`default_case_keyword`（`case` ノードの最初の葉トークンがこれなら default ラベルとして `other`）
+- Mapping の追加項目：`callee_fields`（呼び出しノードの呼び出し先フィールド。その中の最後の identifier の葉を呼び出し先名とする。ADR-0012）、`logical_operators`（`binary` ノードの `operator` フィールドがこれに一致すれば `logical`）、`default_case_keyword`（`case` ノードの最初の葉トークンがこれなら default ラベルとして `other`）
 
 Token は具象構文木の葉（comment / literal は部分木ごと）から作り、以下の汎用規則で分類する。
 
