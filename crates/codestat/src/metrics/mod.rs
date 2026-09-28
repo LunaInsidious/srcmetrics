@@ -1,7 +1,9 @@
 //! Metric Engine (PLAN.md §5.4, §8). Calculators read only the Common IR.
 
 mod common;
+mod complexity;
 mod definition;
+mod nesting;
 mod size;
 
 use crate::ir::{File, Function, Program};
@@ -105,7 +107,11 @@ pub(crate) fn per_file(
 }
 
 pub fn calculators() -> Vec<Box<dyn Calculator>> {
-    vec![Box::new(size::SizeCalculator)]
+    vec![
+        Box::new(size::SizeCalculator),
+        Box::new(complexity::ComplexityCalculator),
+        Box::new(nesting::NestingCalculator),
+    ]
 }
 
 pub fn definitions() -> Vec<&'static MetricDefinition> {

@@ -1,6 +1,6 @@
 //! Helpers shared by calculators. IR-only.
 
-use crate::ir::{File, NodeKind, TokenKind};
+use crate::ir::{File, Node, NodeKind, TokenKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LineClass {
@@ -49,4 +49,46 @@ pub(crate) fn is_statement(kind: NodeKind) -> bool {
         kind,
         Statement | Declaration | Branch | Loop | Return | Jump
     )
+}
+
+/// Decision points of Cyclomatic Complexity.
+pub(crate) fn is_decision(kind: NodeKind) -> bool {
+    use NodeKind::*;
+    matches!(kind, Branch | Loop | Case | Catch | Logical | Conditional)
+}
+
+/// Control structures that open a nesting level.
+pub(crate) fn is_nesting(kind: NodeKind) -> bool {
+    use NodeKind::*;
+    matches!(kind, Branch | Loop | Case | Catch)
+}
+
+/// A branch continuing an if-chain (`else if`, `elif`): a branch whose parent is an `else`
+/// or another branch. It is part of its chain head's level, not a deeper one.
+pub(crate) fn is_continuation(file: &File, node: &Node) -> bool {
+    node.kind == NodeKind::Branch
+        && node
+            .parent
+            .is_some_and(|p| matches!(file.node(p).kind, NodeKind::Else | NodeKind::Branch))
+}
+
+/// Number of nesting levels enclosing `node` within its function (or top-level code).
+/// A continuation branch has the level of its chain head.
+pub(crate) fn nesting_level(file: &File, node: &Node) -> usize {
+    file.ancestors(chain_head(file, node).id)
+        .take_while(|a| a.kind != NodeKind::Function)
+        .filter(|a| is_nesting(a.kind) && !is_continuation(file, a))
+        .count()
+}
+
+/// The first branch of the if-chain `node` continues; `node` itself if it is not a continuation.
+fn chain_head<'a>(file: &'a File, node: &'a Node) -> &'a Node {
+    let mut n = node;
+    while is_continuation(file, n) {
+        n = file
+            .ancestors(n.id)
+            .find(|a| a.kind == NodeKind::Branch)
+            .expect("a continuation branch always has a branch ancestor");
+    }
+    n
 }
