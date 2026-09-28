@@ -4,7 +4,7 @@ use super::{
     Applicability::*, Calculator, FileMetrics, MetricDefinition, Metrics, ProgramMetrics, Scope::*,
 };
 use crate::ir::{NodeKind, Program};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub struct DependencyCalculator;
 
@@ -43,15 +43,16 @@ static DEFINITIONS: &[MetricDefinition] = &[
         id: "dependency.call_depth",
         name: "Call Depth",
         description: "Longest chain of calls through project functions.",
-        definition: "Longest path, in edges, from the function in the project call graph with strongly \
-                     connected components (recursion) collapsed.",
+        definition: "Longest path, in edges, from the function's name in the project call graph of \
+                     function names, with strongly connected components (recursion) collapsed.",
         scopes: &[Function],
         input: "Call nodes and their callee labels, function names",
-        calculation: "Edges go from a function to every project function named like a callee. Edges inside \
-                      a strongly connected component are not counted. 0 when the function calls no project function.",
+        calculation: "Nodes are the names of project functions; a name calls the union of what its \
+                      functions call. Edges inside a strongly connected component are not counted. An \
+                      anonymous function has 1 + the deepest name it calls. 0 when no project function is called.",
         unit: "calls",
         applicability: PartiallyLanguageDependent,
-        limitations: NAME_BASED,
+        limitations: "Name-based: same-named functions share one value.",
         reference: "",
     },
     MetricDefinition {
@@ -117,14 +118,15 @@ fn imports(file: &crate::ir::File) -> usize {
         .count()
 }
 
-/// Name-based call graph over all functions of the program, numbered in file and function order.
+/// Name-based call graph (ADR-0012). Functions are numbered in file and function order; the
+/// graph's nodes are the distinct names of project functions, so same-named functions share a
+/// node and every edge is a distinct (caller name, callee name) pair.
 struct CallGraph<'a> {
+    /// Per function: its name and the distinct names it calls.
     names: Vec<Option<&'a str>>,
     callee_names: Vec<BTreeSet<&'a str>>,
     /// Function name -> functions calling that name.
     callers: HashMap<&'a str, BTreeSet<usize>>,
-    /// Caller -> project functions it calls.
-    edges: Vec<Vec<usize>>,
 }
 
 impl<'a> CallGraph<'a> {
@@ -142,27 +144,17 @@ impl<'a> CallGraph<'a> {
                 );
             }
         }
-        let mut by_name: HashMap<&str, Vec<usize>> = HashMap::new();
-        for (i, name) in names.iter().enumerate() {
-            if let Some(name) = name {
-                by_name.entry(name).or_default().push(i);
-            }
-        }
+        let defined: BTreeSet<&str> = names.iter().flatten().copied().collect();
         let mut callers: HashMap<&str, BTreeSet<usize>> = HashMap::new();
-        let mut edges = vec![vec![]; names.len()];
         for (caller, callees) in callee_names.iter().enumerate() {
-            for callee in callees {
-                if let Some(targets) = by_name.get(callee) {
-                    callers.entry(callee).or_default().insert(caller);
-                    edges[caller].extend(targets);
-                }
+            for callee in callees.iter().filter(|c| defined.contains(*c)) {
+                callers.entry(callee).or_default().insert(caller);
             }
         }
         CallGraph {
             names,
             callee_names,
             callers,
-            edges,
         }
     }
 
@@ -172,27 +164,57 @@ impl<'a> CallGraph<'a> {
             .map_or(0, BTreeSet::len)
     }
 
-    /// Longest path from each function over the condensation of the call graph.
+    /// Call depth of every function: the longest path over the condensation of the name graph.
+    /// An anonymous function is not a node (nothing calls it): 1 + the deepest name it calls.
     fn call_depths(&self) -> Vec<usize> {
-        let component = strongly_connected_components(&self.edges);
-        let count = component.iter().max().map_or(0, |c| c + 1);
-        let mut members = vec![vec![]; count];
-        for (v, c) in component.iter().enumerate() {
-            members[*c].push(v);
+        let mut index: BTreeMap<&str, usize> = BTreeMap::new();
+        for name in self.names.iter().flatten() {
+            let next = index.len();
+            index.entry(name).or_insert(next);
         }
-        // Tarjan numbers components in reverse topological order: callees come first.
-        let mut depth = vec![0; count];
-        for c in 0..count {
-            for &v in &members[c] {
-                for &w in &self.edges[v] {
-                    if component[w] != c {
-                        depth[c] = depth[c].max(depth[component[w]] + 1);
-                    }
+        let callees_of = |f: usize| {
+            self.callee_names[f]
+                .iter()
+                .filter_map(|c| index.get(c).copied())
+        };
+        let mut edges: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); index.len()];
+        for (f, name) in self.names.iter().enumerate() {
+            if let Some(name) = name {
+                edges[index[name]].extend(callees_of(f));
+            }
+        }
+        let edges: Vec<Vec<usize>> = edges.into_iter().map(|e| e.into_iter().collect()).collect();
+        let depth = name_depths(&edges);
+        (0..self.names.len())
+            .map(|f| match self.names[f] {
+                Some(name) => depth[index[name]],
+                None => callees_of(f).map(|c| depth[c] + 1).max().unwrap_or(0),
+            })
+            .collect()
+    }
+}
+
+/// Longest path from each node over the condensation of the graph (edges inside a strongly
+/// connected component are not counted).
+fn name_depths(edges: &[Vec<usize>]) -> Vec<usize> {
+    let component = strongly_connected_components(edges);
+    let count = component.iter().max().map_or(0, |c| c + 1);
+    let mut members = vec![vec![]; count];
+    for (v, c) in component.iter().enumerate() {
+        members[*c].push(v);
+    }
+    // Tarjan numbers components in reverse topological order: callees come first.
+    let mut depth = vec![0; count];
+    for c in 0..count {
+        for &v in &members[c] {
+            for &w in &edges[v] {
+                if component[w] != c {
+                    depth[c] = depth[c].max(depth[component[w]] + 1);
                 }
             }
         }
-        component.iter().map(|c| depth[*c]).collect()
     }
+    component.iter().map(|c| depth[*c]).collect()
 }
 
 /// Tarjan's algorithm, iterative (call chains can be long). Returns the component of each node;
@@ -356,6 +378,49 @@ mod tests {
         assert_eq!(
             function_metric(&r, 0, 0, "dependency.call_depth"),
             v((n - 1) as f64)
+        );
+    }
+
+    #[test]
+    fn same_named_functions_share_one_call_graph_node() {
+        // Two `run`s: one calls helper, one calls nothing. Resolved by name, both reach helper.
+        let mut b = FileBuilder::new("");
+        let root = b.root();
+        let first = b.function(root, "run", 0, lines(1, 1));
+        calls(&mut b, first, &["helper"]);
+        b.function(root, "run", 0, lines(2, 2));
+        b.function(root, "helper", 0, lines(3, 3));
+        let r = DependencyCalculator.compute(&Program {
+            files: vec![b.build()],
+        });
+        assert_eq!(function_metric(&r, 0, 0, "dependency.call_depth"), v(1.0));
+        assert_eq!(function_metric(&r, 0, 1, "dependency.call_depth"), v(1.0));
+        assert_eq!(function_metric(&r, 0, 1, "dependency.fan_out"), v(0.0));
+    }
+
+    #[test]
+    fn many_calls_to_a_common_name_stay_linear() {
+        // 5,000 functions named `get`, each called from 5,000 callers: 25M function pairs.
+        let n = 5_000;
+        let mut b = FileBuilder::new("");
+        let root = b.root();
+        for _ in 0..n {
+            b.function(root, "get", 0, lines(1, 1));
+        }
+        for i in 0..n {
+            let body = b.function(root, &format!("caller{i}"), 0, lines(1, 1));
+            calls(&mut b, body, &["get"]);
+        }
+        let started = std::time::Instant::now();
+        let r = DependencyCalculator.compute(&Program {
+            files: vec![b.build()],
+        });
+        assert_eq!(function_metric(&r, 0, 0, "dependency.fan_in"), v(n as f64));
+        assert_eq!(function_metric(&r, 0, n, "dependency.call_depth"), v(1.0));
+        assert!(
+            started.elapsed().as_secs() < 2,
+            "took {:?}",
+            started.elapsed()
         );
     }
 }

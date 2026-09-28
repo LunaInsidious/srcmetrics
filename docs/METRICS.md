@@ -656,13 +656,13 @@ Longest chain of calls through project functions.
 
 | Item | Value |
 |---|---|
-| Definition | Longest path, in edges, from the function in the project call graph with strongly connected components (recursion) collapsed. |
+| Definition | Longest path, in edges, from the function's name in the project call graph of function names, with strongly connected components (recursion) collapsed. |
 | Scope | function |
 | Input | Call nodes and their callee labels, function names |
-| Calculation | Edges go from a function to every project function named like a callee. Edges inside a strongly connected component are not counted. 0 when the function calls no project function. |
+| Calculation | Nodes are the names of project functions; a name calls the union of what its functions call. Edges inside a strongly connected component are not counted. An anonymous function has 1 + the deepest name it calls. 0 when no project function is called. |
 | Unit | calls |
 | Language Applicability | partially_language_dependent |
-| Limitations | Calls are resolved by callee name only (no types, scopes or imports). |
+| Limitations | Name-based: same-named functions share one value. |
 | Reference | - |
 
 ## `dependency.dependency_count` — Dependency Count
