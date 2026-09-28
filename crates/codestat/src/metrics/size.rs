@@ -239,17 +239,8 @@ fn totals(files: &[&File]) -> Metrics {
     m.insert("size.statement_count", statements.into());
     m.insert("size.token_count", tokens.into());
     m.insert("size.function_count", lengths.len().into());
-    m.insert(
-        "size.avg_function_length",
-        MetricValue::ratio(lengths.iter().sum::<usize>() as f64, lengths.len() as f64),
-    );
-    m.insert(
-        "size.max_function_length",
-        lengths
-            .iter()
-            .max()
-            .map_or(MetricValue::NotApplicable, |&x| x.into()),
-    );
+    m.insert("size.avg_function_length", MetricValue::mean(&lengths));
+    m.insert("size.max_function_length", MetricValue::max(&lengths));
     m
 }
 

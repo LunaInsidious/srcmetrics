@@ -34,6 +34,21 @@ impl MetricValue {
     }
 }
 
+impl MetricValue {
+    /// Mean of `values`; `NotApplicable` when empty.
+    pub fn mean(values: &[usize]) -> MetricValue {
+        MetricValue::ratio(values.iter().sum::<usize>() as f64, values.len() as f64)
+    }
+
+    /// Maximum of `values`; `NotApplicable` when empty.
+    pub fn max(values: &[usize]) -> MetricValue {
+        values
+            .iter()
+            .max()
+            .map_or(MetricValue::NotApplicable, |&x| x.into())
+    }
+}
+
 impl From<usize> for MetricValue {
     fn from(v: usize) -> Self {
         MetricValue::Available(v as f64)

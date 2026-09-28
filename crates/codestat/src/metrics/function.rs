@@ -127,18 +127,8 @@ fn file_metrics(files: &[&File]) -> Metrics {
         .flat_map(|f| &f.functions)
         .map(|f| f.parameters.len())
         .collect();
-    let total: usize = counts.iter().sum();
-    m.insert(
-        "function.avg_parameter_count",
-        MetricValue::ratio(total as f64, counts.len() as f64),
-    );
-    m.insert(
-        "function.max_parameter_count",
-        counts
-            .iter()
-            .max()
-            .map_or(MetricValue::NotApplicable, |&x| x.into()),
-    );
+    m.insert("function.avg_parameter_count", MetricValue::mean(&counts));
+    m.insert("function.max_parameter_count", MetricValue::max(&counts));
     m
 }
 
