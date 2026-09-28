@@ -38,3 +38,18 @@
 - 関連する Issue / ADR 番号
 
 ---
+
+## 2026-09-29: Phase 1 Adapter 実装時の観察
+
+### 背景
+C / Python / TypeScript の Mapping を作成した際に気づいた、言語間の差異と既知の制約。
+
+### 内容 / 観察結果
+- 文字列リテラルは部分木ごと 1 トークンにしている（ADR-0004）。そのため f-string（Python）や template string（TS）内の埋め込み式の識別子・演算子はトークンにならない。
+- Python のメソッドの `self` / `cls` は引数として数える。Java 等の暗黙の `this` とは数え方が異なる（Parameter Count は Partially Language Dependent）。
+- Python `match` の `case _:` はワイルドカードだが `case` として数える（C の `default` と異なり、構文上は通常の case と区別されないため）。
+- Python の docstring は `expression_statement` なので Statement として数えられる。
+- C の `for (int i = 0; ...)` の初期化子は `declaration` として Statement に数えられる。Python の `for` には相当する宣言がない。
+
+### 気になる点 / TODO
+- Documentation（Phase 3）で、Python docstring をドキュメントとして扱う方法を決める必要がある。

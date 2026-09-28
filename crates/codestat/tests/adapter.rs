@@ -1,0 +1,249 @@
+//! Language Adapter tests: source code -> Common IR, per language.
+
+use codestat::error::AnalysisError;
+use codestat::ir::{File, NodeKind, TokenKind};
+use codestat::lang::adapter_for_path;
+
+fn fixture(name: &str) -> (String, String) {
+    let path = format!("{}/../../tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
+    let source = std::fs::read_to_string(&path).unwrap();
+    (path, source)
+}
+
+fn parse(name: &str) -> File {
+    let (path, source) = fixture(name);
+    adapter_for_path(&path)
+        .unwrap()
+        .to_ir(&path, &source)
+        .unwrap()
+}
+
+fn count(file: &File, function: usize, kind: NodeKind) -> usize {
+    file.function_nodes(&file.functions[function])
+        .filter(|n| n.kind == kind)
+        .count()
+}
+
+fn names_and_arity(file: &File) -> Vec<(String, usize)> {
+    file.functions
+        .iter()
+        .map(|f| (f.name.clone().unwrap(), f.parameters.len()))
+        .collect()
+}
+
+const LANGS: [&str; 3] = ["c", "py", "ts"];
+
+#[test]
+fn extracts_functions_with_names_and_parameters() {
+    for ext in LANGS {
+        let file = parse(&format!("equivalence/classify.{ext}"));
+        assert_eq!(
+            names_and_arity(&file),
+            vec![("classify".to_string(), 2), ("max2".to_string(), 2)],
+            "{ext}"
+        );
+    }
+}
+
+#[test]
+fn parameter_names_are_extracted() {
+    for ext in LANGS {
+        let file = parse(&format!("equivalence/classify.{ext}"));
+        let names: Vec<_> = file.functions[0]
+            .parameters
+            .iter()
+            .map(|p| p.name.clone().unwrap())
+            .collect();
+        assert_eq!(names, vec!["values", "n"], "{ext}");
+    }
+}
+
+#[test]
+fn maps_control_structures_to_common_kinds() {
+    for ext in LANGS {
+        let file = parse(&format!("equivalence/classify.{ext}"));
+        assert_eq!(count(&file, 0, NodeKind::Branch), 2, "{ext} branch");
+        assert_eq!(count(&file, 0, NodeKind::Loop), 2, "{ext} loop");
+        assert_eq!(count(&file, 0, NodeKind::Logical), 1, "{ext} logical");
+        assert_eq!(
+            count(&file, 0, NodeKind::Conditional),
+            1,
+            "{ext} conditional"
+        );
+        assert_eq!(count(&file, 0, NodeKind::Return), 1, "{ext} return");
+        assert_eq!(count(&file, 0, NodeKind::Jump), 1, "{ext} jump");
+        assert_eq!(count(&file, 1, NodeKind::Return), 2, "{ext} max2 return");
+    }
+}
+
+#[test]
+fn maps_imports() {
+    for ext in LANGS {
+        let file = parse(&format!("equivalence/classify.{ext}"));
+        assert_eq!(
+            file.top_level_nodes()
+                .filter(|n| n.kind == NodeKind::Import)
+                .count(),
+            1,
+            "{ext}"
+        );
+    }
+}
+
+#[test]
+fn classifies_tokens() {
+    let file = parse("equivalence/classify.c");
+    let line: Vec<_> = file
+        .tokens
+        .iter()
+        .filter(|t| t.range.start.line == 5)
+        .map(|t| (t.kind, t.text.as_str()))
+        .collect();
+    assert_eq!(
+        line,
+        vec![
+            (TokenKind::Keyword, "int"),
+            (TokenKind::Identifier, "score"),
+            (TokenKind::Operator, "="),
+            (TokenKind::Literal, "0"),
+            (TokenKind::Punctuation, ";"),
+        ]
+    );
+}
+
+#[test]
+fn string_literals_and_comments_are_single_tokens() {
+    let file = parse("equivalence/classify.py");
+    let docstring: Vec<_> = file
+        .tokens
+        .iter()
+        .filter(|t| t.range.start.line == 5)
+        .collect();
+    assert_eq!(docstring.len(), 1);
+    assert_eq!(docstring[0].kind, TokenKind::Literal);
+    assert_eq!(
+        file.tokens
+            .iter()
+            .filter(|t| t.kind == TokenKind::Comment)
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn preprocessor_directive_is_a_keyword() {
+    let file = parse("equivalence/classify.c");
+    assert_eq!(file.tokens[0].kind, TokenKind::Keyword);
+    assert_eq!(file.tokens[0].text, "#include");
+}
+
+#[test]
+fn source_ranges_are_one_based_lines() {
+    let file = parse("equivalence/classify.c");
+    let f = &file.functions[0];
+    assert_eq!((f.range.first_line(), f.range.last_line()), (4, 19));
+}
+
+#[test]
+fn syntax_error_is_reported_with_position() {
+    let err = adapter_for_path("broken.c")
+        .unwrap()
+        .to_ir("broken.c", "int f( {\n")
+        .unwrap_err();
+    assert!(
+        matches!(err, AnalysisError::Parse { line: 1, .. }),
+        "{err:?}"
+    );
+}
+
+#[test]
+fn unknown_extension_is_an_error() {
+    let err = adapter_for_path("notes.txt").err().unwrap();
+    assert!(
+        matches!(err, AnalysisError::UnsupportedLanguage { .. }),
+        "{err:?}"
+    );
+}
+
+fn parse_str(path: &str, source: &str) -> File {
+    adapter_for_path(path).unwrap().to_ir(path, source).unwrap()
+}
+
+fn param_names(file: &File, function: usize) -> Vec<Option<String>> {
+    file.functions[function]
+        .parameters
+        .iter()
+        .map(|p| p.name.clone())
+        .collect()
+}
+
+#[test]
+fn c_void_parameter_list_has_no_parameters() {
+    let file = parse_str("a.c", "int f(void) { return 0; }\n");
+    assert!(file.functions[0].parameters.is_empty());
+}
+
+#[test]
+fn c_pointer_returning_function_is_named() {
+    let file = parse_str("a.c", "char *dup(const char *s) { return 0; }\n");
+    assert_eq!(file.functions[0].name.as_deref(), Some("dup"));
+    assert_eq!(param_names(&file, 0), vec![Some("s".to_string())]);
+}
+
+#[test]
+fn c_default_label_is_not_a_case() {
+    let file = parse_str(
+        "a.c",
+        "int f(int x) { switch (x) { case 1: return 1; case 2: return 2; default: return 0; } }\n",
+    );
+    assert_eq!(count(&file, 0, NodeKind::Case), 2);
+}
+
+#[test]
+fn python_parameter_forms_are_named() {
+    let file = parse_str(
+        "a.py",
+        "def f(a, b: int, c=1, d: int = 2, *args, e, **kw):\n    pass\n",
+    );
+    let expected = ["a", "b", "c", "d", "args", "e", "kw"].map(|s| Some(s.to_string()));
+    assert_eq!(param_names(&file, 0), expected);
+}
+
+#[test]
+fn python_keyword_only_separator_is_not_a_parameter() {
+    let file = parse_str("a.py", "def f(a, *, b, /):\n    pass\n");
+    assert_eq!(file.functions[0].parameters.len(), 2);
+}
+
+#[test]
+fn nested_and_anonymous_functions_are_separate_functions() {
+    let file = parse_str(
+        "a.py",
+        "def outer():\n    g = lambda x: x + 1\n    return g\n",
+    );
+    assert_eq!(file.functions.len(), 2);
+    assert_eq!(file.functions[1].name, None);
+    assert_eq!(param_names(&file, 1), vec![Some("x".to_string())]);
+}
+
+#[test]
+fn typescript_arrow_function_with_single_parameter() {
+    let file = parse_str("a.ts", "const inc = x => x + 1;\n");
+    assert_eq!(param_names(&file, 0), vec![Some("x".to_string())]);
+}
+
+#[test]
+fn typescript_methods_are_named_functions() {
+    let file = parse_str(
+        "a.ts",
+        "class A {\n  run(a: number, b?: string): void {}\n}\n",
+    );
+    assert_eq!(names_and_arity(&file), vec![("run".to_string(), 2)]);
+}
+
+#[test]
+fn tsx_is_supported() {
+    let file = parse_str("a.tsx", "const App = () => <div>{1}</div>;\n");
+    assert_eq!(file.language, "tsx");
+    assert_eq!(file.functions.len(), 1);
+}

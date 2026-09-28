@@ -354,16 +354,17 @@ Mapping {
 
 関数の名前・引数・本体は、以下の汎用規則で取り出す。
 
-- 名前：フィールド `name` を辿る。なければフィールド `declarator` を再帰的に辿り、最初の identifier を名前にする
-- 引数：フィールド `parameters` を同様に探し、その名前付き子ノード（コメントを除く）を引数とする
+- 名前：Mapping の `name_fields`（例：C は `declarator`、Python は `name`、TypeScript は `name`, `pattern`）を順に辿り、identifier に到達したらそれを名前とする。辿り終えたノードが identifier でなければ、その最初の identifier 子ノードを名前とする（例：Python `x: int`, `*args`）
+- 引数：フィールド `parameters` を関数ノードおよび name_fields の連鎖上で探し、その名前付き子ノード（コメントを除く）を引数とする。`parameters` がなく単数の `parameter` フィールドがある場合（例：JS `x => x`）はそれを唯一の引数とする。どちらもなければ引数 0 個
 - 本体：フィールド `body`
+- Mapping の追加項目：`logical_operators`（`binary` ノードの `operator` フィールドがこれに一致すれば `logical`）、`default_case_keyword`（`case` ノードの先頭トークンがこれなら default ラベルとして `other`）
 
 Token は具象構文木の葉（comment / literal は部分木ごと）から作り、以下の汎用規則で分類する。
 
 1. `comments` に載っている → comment
 2. `literals` に載っている → literal
 3. `identifiers` に載っている → identifier
-4. テキストが英字または `_` で始まる → keyword
+4. テキストに英字または `_` を含む → keyword（`int`, `return`, C の `#include` 等）
 5. 区切り記号（`, ; ( ) [ ] { }`）→ punctuation
 6. それ以外 → operator
 
@@ -395,6 +396,7 @@ Token は具象構文木の葉（comment / literal は部分木ごと）から�
 | Date | Status | Change |
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
+| 2026-09-29 | Accepted | 実装に合わせ、名前・引数の抽出規則、keyword 判定（「含む」）、logical / default case の Mapping 項目を明記 |
 
 ---
 
@@ -415,7 +417,9 @@ Token は具象構文木の葉（comment / literal は部分木ごと）から�
 
 - メトリクス値：`MetricValue = Available(f64) | NotApplicable | Unsupported | Error(String)`
   - 例：関数が 0 個のファイルの「平均関数長」は `NotApplicable`
-- 解析エラー：`AnalysisError = Parse | UnsupportedSyntax | UnsupportedLanguageFeature | IrConversion`（§14）
+- 解析エラー：`AnalysisError`（§14）。現時点で実装する種別は `UnsupportedLanguage | Parse | IrConversion`
+  - §14 の `Unsupported Syntax` / `Unsupported Language Feature` は、それを発生させる Adapter の処理が現れた時点で追加する（発生源のない列挙子は作らない）
+  - Metric Not Applicable / Metric Calculation Error は `MetricValue` 側で表現する
   - 構文木に ERROR / MISSING ノードがある場合は、位置を添えて `Parse` エラーとする。回復結果から部分的なメトリクスは出さない
   - 対応していない拡張子は `UnsupportedLanguage` エラーとする（言語を推測しない）
 - プロジェクト（ディレクトリ）解析では、失敗したファイルを `status: error` と理由付きで結果に記録し、他のファイルの解析は続ける
@@ -448,6 +452,7 @@ Token は具象構文木の葉（comment / literal は部分木ごと）から�
 | Date | Status | Change |
 |---|---|---|
 | 2026-09-29 | Accepted | Initial |
+| 2026-09-29 | Accepted | 実装済みのエラー種別を明記 |
 
 ---
 
