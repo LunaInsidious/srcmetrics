@@ -200,3 +200,20 @@ fn model_train_then_predict() {
         files["files"].as_array().unwrap().len()
     );
 }
+
+#[test]
+fn report_writes_a_self_contained_html_file() {
+    let result = analyzed("equivalence");
+    let out = format!(
+        "{}/../../target/cli-test/report.html",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let output = codestat(&["report", &result, "-o", &out]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let html = std::fs::read_to_string(&out).unwrap();
+    assert!(html.contains("class=\"heatmap\""));
+}

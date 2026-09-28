@@ -43,6 +43,14 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Unit::File)]
         scope: Unit,
     },
+    /// Write a self-contained HTML report (tables, histograms, correlation heatmap) of a result.
+    Report {
+        /// Result file written by `codestat analyze` (JSON).
+        result: PathBuf,
+        /// Write the report to this file instead of stdout.
+        #[arg(long, short)]
+        output: Option<PathBuf>,
+    },
     /// Experimental readability model fitted on your own labels (no built-in weights).
     Model {
         #[command(subcommand)]
@@ -179,6 +187,10 @@ fn run(command: Command) -> Result<(), String> {
                 None,
                 &to_json(&model::predict_all(&trained, &load_results(&results)?))?,
             )
+        }
+        Command::Report { result, output } => {
+            let result = load_results(std::slice::from_ref(&result))?.remove(0);
+            write(output, &codestat::report::to_html(&result))
         }
         Command::Metrics { format } => {
             let definitions = metrics::definitions();
