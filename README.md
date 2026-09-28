@@ -1,5 +1,7 @@
 # srcmetrics
 
+English | [日本語](README_ja.md)
+
 Language-independent source code metrics for C, C++, Go, Java, JavaScript, Python, Rust and TypeScript.
 
 srcmetrics collects quantitative features related to readability and maintainability — size,
