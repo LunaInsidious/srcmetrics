@@ -1,6 +1,6 @@
 # srcmetrics
 
-English | [日本語](README_ja.md)
+English | [日本語](https://github.com/LunaInsidious/srcmetrics/blob/main/README_ja.md)
 
 Language-independent source code metrics for C, C++, Go, Java, JavaScript, Python, Rust and TypeScript.
 
@@ -59,7 +59,7 @@ cognitive complexity and maximum nesting depth; this is part of the test suite.
 
 53 metrics at function, file and project scope. Run `srcmetrics metrics` for the full definitions
 (definition, calculation, unit, language applicability, limitations and references), or see
-[docs/METRICS.md](docs/METRICS.md).
+[docs/METRICS.md](https://github.com/LunaInsidious/srcmetrics/blob/main/docs/METRICS.md).
 
 | Group | Metrics |
 |---|---|
@@ -196,17 +196,17 @@ Each metric's definition lists its own limitations.
 
 Design documents are written in Japanese:
 
-- [PLAN.md](PLAN.md) — requirements
-- [docs/SPEC.md](docs/SPEC.md) — technical specification
-- [docs/ADR.md](docs/ADR.md) — architecture decision records
-- [docs/METRICS.md](docs/METRICS.md) — metric definitions (generated from the code)
+- [PLAN.md](https://github.com/LunaInsidious/srcmetrics/blob/main/PLAN.md) — requirements
+- [docs/SPEC.md](https://github.com/LunaInsidious/srcmetrics/blob/main/docs/SPEC.md) — technical specification
+- [docs/ADR.md](https://github.com/LunaInsidious/srcmetrics/blob/main/docs/ADR.md) — architecture decision records
+- [docs/METRICS.md](https://github.com/LunaInsidious/srcmetrics/blob/main/docs/METRICS.md) — metric definitions (generated from the code)
 
 ## License
 
 Licensed under either of
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT license ([LICENSE-MIT](LICENSE-MIT))
+- Apache License, Version 2.0 ([LICENSE-APACHE](https://github.com/LunaInsidious/srcmetrics/blob/main/LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](https://github.com/LunaInsidious/srcmetrics/blob/main/LICENSE-MIT))
 
 at your option.
 

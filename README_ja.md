@@ -1,6 +1,6 @@
 # srcmetrics
 
-[English](README.md) | 日本語
+[English](https://github.com/LunaInsidious/srcmetrics/blob/main/README.md) | 日本語
 
 C, C++, Go, Java, JavaScript, Python, Rust, TypeScript のソースコードから、言語に依存しない定義でメトリクスを取得するツール・ライブラリです。
 
@@ -46,7 +46,7 @@ Rust 1.85 以上が必要です。文法定義は C からコンパイルされ�
 
 ## メトリクス
 
-関数・ファイル・プロジェクトの各スコープで 53 種類。すべての定義（意味、計算方法、単位、言語依存性、制約、参考文献）は `srcmetrics metrics` で出力できます。[docs/METRICS.md](docs/METRICS.md) にもあります。
+関数・ファイル・プロジェクトの各スコープで 53 種類。すべての定義（意味、計算方法、単位、言語依存性、制約、参考文献）は `srcmetrics metrics` で出力できます。[docs/METRICS.md](https://github.com/LunaInsidious/srcmetrics/blob/main/docs/METRICS.md) にもあります。
 
 | 分類 | メトリクス |
 |---|---|
@@ -174,16 +174,16 @@ fn main() -> Result<(), srcmetrics::error::AnalysisError> {
 
 ## ドキュメント
 
-- [PLAN.md](PLAN.md) — 要求仕様
-- [docs/SPEC.md](docs/SPEC.md) — 技術仕様書
-- [docs/ADR.md](docs/ADR.md) — 設計判断の記録（ADR）
-- [docs/METRICS.md](docs/METRICS.md) — メトリクス定義書（コードから生成）
+- [PLAN.md](https://github.com/LunaInsidious/srcmetrics/blob/main/PLAN.md) — 要求仕様
+- [docs/SPEC.md](https://github.com/LunaInsidious/srcmetrics/blob/main/docs/SPEC.md) — 技術仕様書
+- [docs/ADR.md](https://github.com/LunaInsidious/srcmetrics/blob/main/docs/ADR.md) — 設計判断の記録（ADR）
+- [docs/METRICS.md](https://github.com/LunaInsidious/srcmetrics/blob/main/docs/METRICS.md) — メトリクス定義書（コードから生成）
 
 ## ライセンス
 
 以下のいずれかを選択できます。
 
-- Apache License, Version 2.0（[LICENSE-APACHE](LICENSE-APACHE)）
-- MIT license（[LICENSE-MIT](LICENSE-MIT)）
+- Apache License, Version 2.0（[LICENSE-APACHE](https://github.com/LunaInsidious/srcmetrics/blob/main/LICENSE-APACHE)）
+- MIT license（[LICENSE-MIT](https://github.com/LunaInsidious/srcmetrics/blob/main/LICENSE-MIT)）
 
 明示的に別段の意思表示をしない限り、あなたが本プロジェクトへの取り込みを意図して提出した貢献は、Apache-2.0 ライセンスの定義に従い、追加の条件なしに上記のデュアルライセンスで提供されるものとします。
